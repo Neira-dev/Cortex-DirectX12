@@ -60,6 +60,12 @@ public:
 	 */
 	Rml::ElementDocument* LoadDocument(const std::string& path);
 
+	/**
+	 * @brief RmlUi 公式の要素インスペクタ (Debugger プラグイン) の表示/非表示を切り替える
+	 * @note WndProc から F8 キーで呼ばれる。ツリー構造・適用中の RCSS プロパティをその場で確認できる
+	 */
+	void ToggleDebugger();
+
 	Rml::Context* GetContext() const { return m_context; }
 	bool IsInitialized() const { return m_initialized; }
 

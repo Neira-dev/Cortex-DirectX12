@@ -88,11 +88,12 @@
   </ItemDefinitionGroup>
 
   <!-- RmlUi のリンクは Application (x64) かつ CortexUseRmlUi=true のときだけ。
-       rmlui.lib は同梱 FreeType に依存する (静的リンクなので両方必要)。 -->
+       rmlui.lib は同梱 FreeType に依存する (静的リンクなので両方必要)。
+       rmlui_debugger.lib は RmlUi 公式の要素インスペクタ (F8 でトグル、RmlUiGUI::Init 内で初期化)。 -->
   <ItemDefinitionGroup Condition="'$(MSBuildProjectName)' == 'Application' and '$(Platform)' == 'x64' and '$(CortexUseRmlUi)' == 'true'">
     <Link>
       <AdditionalLibraryDirectories>$(CortexRmlUiLibDir);$(CortexFreeTypeLibDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>rmlui.lib;$(CortexFreeTypeLib);%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>rmlui.lib;rmlui_debugger.lib;$(CortexFreeTypeLib);%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
 

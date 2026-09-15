@@ -2,6 +2,7 @@
 #include <RmlUi/Core/Core.h>
 #include <RmlUi/Core/ElementDocument.h>
 #include <RmlUi/Core/Input.h>
+#include <RmlUi/Debugger/Debugger.h>
 #include <windowsx.h>
 
 RmlUiGUI* RmlUiGUI::s_instance = nullptr;
@@ -105,6 +106,10 @@ bool RmlUiGUI::Init(HWND hwnd, UINT width, UINT height)
 		return false;
 	}
 
+	// 公式 Debugger プラグイン。既定は非表示 (F8 でトグル、WndProc 経由 ToggleDebugger())。
+	// .rml/.rcss を手書きする代わりに、実行中のツリー構造・適用中のプロパティをその場で確認できる
+	Rml::Debugger::Initialise(m_context);
+
 	m_initialized = true;
 	return true;
 }
@@ -146,6 +151,11 @@ void RmlUiGUI::Render(ID3D12GraphicsCommandList* commandList)
 	const Rml::Vector2i dims = m_context->GetDimensions();
 	m_renderInterface.BeginFrame(commandList, static_cast<UINT>(dims.x), static_cast<UINT>(dims.y));
 	m_context->Render();
+}
+
+void RmlUiGUI::ToggleDebugger()
+{
+	Rml::Debugger::SetVisible(!Rml::Debugger::IsVisible());
 }
 
 Rml::ElementDocument* RmlUiGUI::LoadDocument(const std::string& path)
@@ -211,6 +221,11 @@ bool RmlUiGUI::ProcessWin32Message(HWND hwnd, UINT message, WPARAM wParam, LPARA
 	case WM_KEYDOWN:
 	case WM_SYSKEYDOWN:
 	{
+		if (wParam == VK_F8)
+		{
+			ToggleDebugger();
+			return true;
+		}
 		const Rml::Input::KeyIdentifier key = VirtualKeyToRmlKey(wParam);
 		if (key == Rml::Input::KI_UNKNOWN)
 		{
