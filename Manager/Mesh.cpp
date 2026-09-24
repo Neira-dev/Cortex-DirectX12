@@ -4,6 +4,8 @@
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
+#include <cstdint>
+#include "../AssetPackCore/GlobalPak.h"
 
 Mesh* Mesh::instance = nullptr;
 
@@ -59,12 +61,29 @@ bool Mesh::Load(const std::string& FILEPATH)
 {
 	Assimp::Importer importer;
 
-	const aiScene* scene;
-	scene = importer.ReadFile(
-		FILEPATH,
-		aiProcess_Triangulate |
-		aiProcess_FlipUVs
-	);
+	const aiScene* scene = nullptr;
+	const unsigned int flags = aiProcess_Triangulate | aiProcess_FlipUVs;
+
+	// If a packed asset archive (.cpak) is open and contains this virtual path,
+	// read the (decrypted) bytes into memory and parse from there instead of
+	// touching the loose file on disk. Falls back to the loose file otherwise,
+	// so unpacked/dev-time asset paths keep working exactly as before.
+	std::vector<uint8_t> pakBytes;
+	if (AssetPack::IsGlobalPakOpen() && AssetPack::GlobalPakReader().Has(FILEPATH))
+	{
+		pakBytes = AssetPack::GlobalPakReader().Read(FILEPATH);
+	}
+
+	if (!pakBytes.empty())
+	{
+		size_t dotPos = FILEPATH.find_last_of('.');
+		std::string hint = (dotPos == std::string::npos) ? "" : FILEPATH.substr(dotPos + 1);
+		scene = importer.ReadFileFromMemory(pakBytes.data(), pakBytes.size(), flags, hint.c_str());
+	}
+	else
+	{
+		scene = importer.ReadFile(FILEPATH, flags);
+	}
 
 	if (scene == nullptr)
 	{

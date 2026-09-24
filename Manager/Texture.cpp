@@ -1,6 +1,7 @@
 ﻿#include "Texture.h"
 #include "DirectX12.h"
 #include <cctype>
+#include "../AssetPackCore/GlobalPak.h"
 
 #pragma comment(lib, "dxguid.lib")
 
@@ -75,9 +76,6 @@ bool Texture::LoadDefaults()
 
 bool Texture::LoadInternal(const string& filePath)
 {
-	// DirectXTexで画像をCPUメモリに読み込む
-	std::wstring wFilePath(filePath.begin(), filePath.end());
-
 	// 拡張子がhdrならRadiance(.hdr)形式として読み込む(それ以外は通常のWIC画像として読み込む)
 	bool isHdr = false;
 	size_t dotPos = filePath.find_last_of('.');
@@ -91,10 +89,29 @@ bool Texture::LoadInternal(const string& filePath)
 		isHdr = (ext == "hdr");
 	}
 
+	// パックアーカイブ(.cpak)が開いていてこの仮想パスを含む場合は、復号済みバイト列を
+	// メモリから読み込む。開いていない/含まれない場合は従来通りルーズファイルを読む。
+	std::vector<uint8_t> pakBytes;
+	if (AssetPack::IsGlobalPakOpen() && AssetPack::GlobalPakReader().Has(filePath))
+	{
+		pakBytes = AssetPack::GlobalPakReader().Read(filePath);
+	}
+
 	DirectX::ScratchImage scratch;
-	HRESULT hr = isHdr
-		? DirectX::LoadFromHDRFile(wFilePath.c_str(), nullptr, scratch)
-		: DirectX::LoadFromWICFile(wFilePath.c_str(), DirectX::WIC_FLAGS_NONE, nullptr, scratch);
+	HRESULT hr;
+	if (!pakBytes.empty())
+	{
+		hr = isHdr
+			? DirectX::LoadFromHDRMemory(pakBytes.data(), pakBytes.size(), nullptr, scratch)
+			: DirectX::LoadFromWICMemory(pakBytes.data(), pakBytes.size(), DirectX::WIC_FLAGS_NONE, nullptr, scratch);
+	}
+	else
+	{
+		std::wstring wFilePath(filePath.begin(), filePath.end());
+		hr = isHdr
+			? DirectX::LoadFromHDRFile(wFilePath.c_str(), nullptr, scratch)
+			: DirectX::LoadFromWICFile(wFilePath.c_str(), DirectX::WIC_FLAGS_NONE, nullptr, scratch);
+	}
 	if (FAILED(hr))
 	{
 		return false;
