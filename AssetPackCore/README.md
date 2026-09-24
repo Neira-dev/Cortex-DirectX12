@@ -56,16 +56,17 @@ pak 化とは無関係に行える。「差し替えるたびに pak 化」と�
 - `Texture::LoadInternal`: 同様に pak にあれば `DirectX::LoadFromWICMemory` /
   `LoadFromHDRMemory` を、無ければ従来通り `LoadFromWICFile` / `LoadFromHDRFile` を使う。
 
-**`AssetPack::TryOpenGlobalPak(path, key)` は呼ばれていない** — つまりこの状態では
-`IsGlobalPakOpen()` が常に false のままなので、今まで通りルーズファイル運用のまま挙動は
-一切変わらない。配布ビルドで pak を有効化したい場合は、起動シーケンスのどこかで一度
+`Application/Template.cpp` の `TemplateMain` 冒頭 (`/* 初期化 */` ブロックの先頭、Window 初期化より前)
+で `AssetPack::TryOpenGlobalPak("Assets.cpak")` を呼ぶように実装済み。鍵は既定引数の
+`AssetPack::DefaultKey()` を使っている。
 
-```cpp
-AssetPack::TryOpenGlobalPak("Assets.cpak", myKey);
-```
-
-を呼ぶ処理を追加する必要がある (どこで呼ぶか、鍵をどう埋め込むかは配布フローの都合に
-合わせて検討: `Application` の初期化処理が候補)。この呼び出しの追加は行っていない。
+- リポジトリルート (デバッグ実行時の作業ディレクトリ) に `Assets.cpak` が無ければ `Open()` は
+  false を返すだけで何も起きない → 今まで通りルーズファイル運用のまま動く。
+- `AssetPacker --output Assets.cpak` で生成した pak をルートに置けば、以後の `Mesh::Load` /
+  `Texture::LoadInternal` が自動的にそちらを優先する。
+- 本番配布で `--key-file` により独自鍵を使った場合は、`Template.cpp` 側の
+  `TryOpenGlobalPak("Assets.cpak")` 呼び出しにも同じ鍵を渡すよう変更が必要
+  (現状は両方とも `DefaultKey()` 決め打ち)。
 
 動作確認: `Manager.vcxproj` 経由のフルビルドは `ThirdParty/DirectXTex` の shader 事前生成
 (`Shaders/Compiled/*.inc`) が本環境に無いため通せなかった (既知の環境依存問題、今回の変更とは

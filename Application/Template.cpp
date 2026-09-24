@@ -19,6 +19,7 @@
 #include <RmlUi/Core/EventListener.h>
 #include <RmlUi/Core/ID.h>
 #include <mutex>
+#include "../AssetPackCore/GlobalPak.h"
 
 namespace
 {
@@ -52,6 +53,14 @@ int TemplateMain(HINSTANCE hInstance, int nCmdShow)
 
 	/* 初期化 */
 	{
+		/* アセットパック (.cpak) を開く — 配布ビルド用の Assets.cpak がリポジトリルート
+		   (作業ディレクトリ) に存在すればそれ以降 Mesh::Load / Texture::LoadInternal は
+		   自動的にそちらを優先する。ファイルが無い場合は何もせず false のまま残り、
+		   開発中と同じくルーズファイル読み込みにフォールバックし続けるので安全に常時呼べる。
+		   鍵は AssetPackCore::DefaultKey() (既定引数)。本番配布では AssetPacker 側と
+		   同じ --key-file の鍵に差し替えること。 */
+		AssetPack::TryOpenGlobalPak("Assets.cpak");
+
 		/* Windowの初期化 */
 		window->SetWindowTitle("Template");
 		window->SetUseCustomTitleBar(false);
