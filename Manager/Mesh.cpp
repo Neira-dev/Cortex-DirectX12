@@ -6,6 +6,7 @@
 #include <assimp/postprocess.h>
 #include <cstdint>
 #include "../AssetPackCore/GlobalPak.h"
+#include "../AssetPackCore/PathHash.h"
 
 Mesh* Mesh::instance = nullptr;
 
@@ -66,15 +67,28 @@ bool Mesh::Load(const std::string& FILEPATH)
 
 	// If a packed asset archive (.cpak) is open and contains this virtual path,
 	// read the (decrypted) bytes into memory and parse from there instead of
-	// touching the loose file on disk. Falls back to the loose file otherwise,
-	// so unpacked/dev-time asset paths keep working exactly as before.
+	// touching the loose file on disk. Falls back to the loose file when the
+	// path simply is not packed (normal during dev-time loose-file work), so
+	// unpacked/dev-time asset paths keep working exactly as before. If the
+	// path IS packed but the read itself fails (corrupted/truncated .cpak),
+	// that is surfaced explicitly instead of being silently treated the same
+	// as "not packed" -- falling through to a loose file in that case would
+	// otherwise mask real pak corruption behind a generic "file not found".
 	std::vector<uint8_t> pakBytes;
-	if (AssetPack::IsGlobalPakOpen() && AssetPack::GlobalPakReader().Has(FILEPATH))
+	AssetPack::PakReader::ReadResult pakResult = AssetPack::PakReader::ReadResult::NotFound;
+	AssetPack::GlobalPak* pak = AssetPack::GlobalPak::Get();
+	if (pak->IsOpen())
 	{
-		pakBytes = AssetPack::GlobalPakReader().Read(FILEPATH);
+		pakResult = pak->Reader().TryRead(FILEPATH, pakBytes);
 	}
 
-	if (!pakBytes.empty())
+	if (pakResult == AssetPack::PakReader::ReadResult::Failed)
+	{
+		std::string warning = "AssetPack: failed to read a packed asset (pak may be corrupted): " + FILEPATH;
+		MessageBox(nullptr, warning.c_str(), "AssetPack Warning", MB_OK | MB_ICONWARNING);
+	}
+
+	if (pakResult == AssetPack::PakReader::ReadResult::Success)
 	{
 		size_t dotPos = FILEPATH.find_last_of('.');
 		std::string hint = (dotPos == std::string::npos) ? "" : FILEPATH.substr(dotPos + 1);
@@ -232,14 +246,14 @@ bool Mesh::Load(const std::string& FILEPATH)
 		meshData.subMeshes.push_back(std::move(subMesh));
 	}
 
-	m_meshMap[FILEPATH] = meshData;
+	m_meshMap[AssetPack::NormalizePath(FILEPATH)] = meshData;
 
 	return true;
 }
 
 const IMesh* Mesh::GetMeshData(const std::string& name)
 {
-	auto it = m_meshMap.find(name);
+	auto it = m_meshMap.find(AssetPack::NormalizePath(name));
 	if (it != m_meshMap.end())
 	{
 		return &(it->second);

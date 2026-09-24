@@ -2,27 +2,28 @@
 
 namespace AssetPack
 {
-	namespace
+	GlobalPak* GlobalPak::instance = nullptr;
+
+	GlobalPak* GlobalPak::Get()
 	{
-		PakReader& Instance()
+		if (instance == nullptr)
 		{
-			static PakReader reader;
-			return reader;
+			instance = new GlobalPak();
+		}
+		return instance;
+	}
+
+	void GlobalPak::Del()
+	{
+		if (instance != nullptr)
+		{
+			delete instance;
+			instance = nullptr;
 		}
 	}
 
-	bool TryOpenGlobalPak(const std::string& pakPath, const Key32& key)
+	bool GlobalPak::TryOpen(const std::string& pakPath, const Key32& key)
 	{
-		return Instance().Open(pakPath, key);
-	}
-
-	bool IsGlobalPakOpen()
-	{
-		return Instance().IsOpen();
-	}
-
-	PakReader& GlobalPakReader()
-	{
-		return Instance();
+		return m_reader.Open(pakPath, key);
 	}
 }

@@ -20,6 +20,7 @@
 #include <RmlUi/Core/ID.h>
 #include <mutex>
 #include "../AssetPackCore/GlobalPak.h"
+#include "AssetPackKey.h"
 
 namespace
 {
@@ -57,9 +58,23 @@ int TemplateMain(HINSTANCE hInstance, int nCmdShow)
 		   (作業ディレクトリ) に存在すればそれ以降 Mesh::Load / Texture::LoadInternal は
 		   自動的にそちらを優先する。ファイルが無い場合は何もせず false のまま残り、
 		   開発中と同じくルーズファイル読み込みにフォールバックし続けるので安全に常時呼べる。
-		   鍵は AssetPackCore::DefaultKey() (既定引数)。本番配布では AssetPacker 側と
-		   同じ --key-file の鍵に差し替えること。 */
-		AssetPack::TryOpenGlobalPak("Assets.cpak");
+		   鍵は AssetPackCore::DefaultKey() の既定引数には依存せず、AssetPackKey.h の
+		   GetProjectPakKey() を明示的に渡す (AssetPacker --key-file と同じ鍵にすること)。 */
+		const AssetPack::Key32& pakKey = AppAssetPack::GetProjectPakKey();
+#ifndef _DEBUG
+		// Release ビルドで AssetPackKey.h の鍵が未カスタマイズ (ライブラリの公開既定鍵の
+		// まま) だと、Assets.cpak を暗号化しても意味が無い (鍵がソースに公開されているため)。
+		// 気づかずに出荷することを防ぐため、Release では明示的に警告する。
+		if (pakKey == AssetPack::DefaultKey())
+		{
+			MessageBox(nullptr,
+				"AssetPackKey.h の鍵が未カスタマイズです (AssetPackCore::DefaultKey() のまま)。\n"
+				"このまま配布すると Assets.cpak の暗号化キーが公開ソースと同じになり、保護の意味がありません。\n"
+				"Application/AssetPackKey.h の GetProjectPakKey() を専用の鍵に差し替えてください。",
+				"AssetPack Warning", MB_OK | MB_ICONWARNING);
+		}
+#endif
+		AssetPack::GlobalPak::Get()->TryOpen("Assets.cpak", pakKey);
 
 		/* Windowの初期化 */
 		window->SetWindowTitle("Template");

@@ -169,6 +169,9 @@
     <ProjectReference Include="..\Manager\Manager.vcxproj">
       <Project>{9aa7b4ae-e54b-48a1-a715-608347def720}</Project>
     </ProjectReference>
+    <ProjectReference Include="..\AssetPackCore\AssetPackCore.vcxproj">
+      <Project>{d3f1a9b2-6e44-4c7a-9b1d-2a5c8e4f7061}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\thread\thread.vcxproj">
       <Project>{a244d6e1-5559-400b-bb8d-35a0188f1323}</Project>
     </ProjectReference>
@@ -182,6 +185,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Template.h" />
+    <ClInclude Include="AssetPackKey.h" />
   </ItemGroup>
   <Target Name="CopyLlamaRuntimeDlls" AfterTargets="Build">
     <ItemGroup>

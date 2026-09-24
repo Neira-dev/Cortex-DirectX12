@@ -14,11 +14,17 @@ namespace AssetPack
 		m_entries.push_back(PendingEntry{ virtualPath, std::move(bytes), typeTag });
 	}
 
-	bool PakWriter::WriteTo(const std::string& outPakPath, const Key32& key) const
+	bool PakWriter::WriteTo(const std::string& outPakPath, const Key32& key)
 	{
-		// パスハッシュの重複チェック (異なる仮想パスが同じハッシュに落ちる事故を検出)
+		// パスハッシュの重複チェック (異なる仮想パスが同じハッシュに落ちる事故を検出)。
+		// 出力ファイルを開く前に行う: ここで失敗した場合に outPakPath の既存ファイルを
+		// (trunc で) 巻き込みで壊さないため。各エントリのハッシュはここで1回だけ計算し、
+		// 後段のインデックス構築で使い回す (二重計算の回避)。
+		std::vector<uint64_t> hashes;
+		hashes.reserve(m_entries.size());
 		{
 			std::unordered_set<uint64_t> seen;
+			seen.reserve(m_entries.size());
 			for (const auto& e : m_entries)
 			{
 				const uint64_t h = Hash64(e.virtualPath);
@@ -26,6 +32,7 @@ namespace AssetPack
 				{
 					return false;
 				}
+				hashes.push_back(h);
 			}
 		}
 
@@ -46,28 +53,23 @@ namespace AssetPack
 
 		std::random_device rd;
 
+		// 1st pass: メタデータのみ (バイト列本体には触れない) を組み立ててヘッダー+
+		// インデックスを先に書き出す。
 		std::vector<PakEntry> indexEntries;
 		indexEntries.reserve(m_entries.size());
-		std::vector<std::vector<uint8_t>> encrypted;
-		encrypted.reserve(m_entries.size());
-
 		uint64_t runningOffset = dataStart;
-		for (const auto& e : m_entries)
+		for (size_t i = 0; i < m_entries.size(); ++i)
 		{
+			const auto& e = m_entries[i];
 			PakEntry pe{};
-			pe.pathHash = Hash64(e.virtualPath);
+			pe.pathHash = hashes[i];
 			pe.dataOffset = runningOffset;
 			pe.dataSize = e.bytes.size();
 			pe.typeTag = e.typeTag;
 			pe.flags = kPakFlagEncrypted;
 			for (auto& b : pe.nonce) b = static_cast<uint8_t>(rd() & 0xFF);
-
-			std::vector<uint8_t> cipher = e.bytes;
-			Chacha20Xor(key.data(), pe.nonce, 0, cipher.data(), cipher.size());
-
 			runningOffset += pe.dataSize;
 			indexEntries.push_back(pe);
-			encrypted.push_back(std::move(cipher));
 		}
 
 		out.write(reinterpret_cast<const char*>(&header), sizeof(header));
@@ -75,11 +77,17 @@ namespace AssetPack
 		{
 			out.write(reinterpret_cast<const char*>(&pe), sizeof(pe));
 		}
-		for (const auto& blob : encrypted)
+
+		// 2nd pass: 各エントリを in-place で暗号化して即座に書き出す。平文コピー+暗号文
+		// コピーを同時に保持しないので、全アセット分を二重に確保しない
+		// (ピークメモリは元の平文サイズのまま)。
+		for (size_t i = 0; i < m_entries.size(); ++i)
 		{
-			if (!blob.empty())
+			auto& bytes = m_entries[i].bytes;
+			if (!bytes.empty())
 			{
-				out.write(reinterpret_cast<const char*>(blob.data()), static_cast<std::streamsize>(blob.size()));
+				Chacha20Xor(key.data(), indexEntries[i].nonce, 0, bytes.data(), bytes.size());
+				out.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
 			}
 		}
 

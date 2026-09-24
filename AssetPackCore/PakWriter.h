@@ -21,7 +21,13 @@ namespace AssetPack
 		size_t FileCount() const { return m_entries.size(); }
 
 		// 失敗時 (パス重複 / ファイル書き込み失敗) は false を返す。
-		bool WriteTo(const std::string& outPakPath, const Key32& key) const;
+		// 各エントリのバイト列を保持したまま複製 (暗号化用コピー) を作ると全アセット分の
+		// メモリを二重に確保することになるため、WriteTo は各エントリを in-place で
+		// 暗号化してから書き出す。呼び出し後、内部の m_entries は平文ではなく暗号化後の
+		// バイト列を保持した状態になる (再度 WriteTo を呼んでも元の平文には戻せない)。
+		// 使い方は「AddFile で組み立てて WriteTo を1回呼んで破棄する」を想定しているため、
+		// これは実用上の問題にならない。
+		bool WriteTo(const std::string& outPakPath, const Key32& key);
 
 	private:
 		struct PendingEntry

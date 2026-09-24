@@ -2,6 +2,7 @@
 #include "DirectX12.h"
 #include <cctype>
 #include "../AssetPackCore/GlobalPak.h"
+#include "../AssetPackCore/PathHash.h"
 
 #pragma comment(lib, "dxguid.lib")
 
@@ -90,16 +91,28 @@ bool Texture::LoadInternal(const string& filePath)
 	}
 
 	// パックアーカイブ(.cpak)が開いていてこの仮想パスを含む場合は、復号済みバイト列を
-	// メモリから読み込む。開いていない/含まれない場合は従来通りルーズファイルを読む。
+	// メモリから読み込む。単に「pakに収録されていない」場合(開発中のルーズファイル運用等)
+	// は従来通りルーズファイルへフォールバックするが、収録されているのに読み込み自体が
+	// 失敗した場合(壊れた/改ざんされた .cpak)は「未収録」と区別して警告を出す。
+	// 黙ってルーズファイルへフォールバックすると、配布ビルド(ルーズファイル無し)で
+	// pak破損の原因が「file not found」に埋もれて分からなくなるため。
 	std::vector<uint8_t> pakBytes;
-	if (AssetPack::IsGlobalPakOpen() && AssetPack::GlobalPakReader().Has(filePath))
+	AssetPack::PakReader::ReadResult pakResult = AssetPack::PakReader::ReadResult::NotFound;
+	AssetPack::GlobalPak* pak = AssetPack::GlobalPak::Get();
+	if (pak->IsOpen())
 	{
-		pakBytes = AssetPack::GlobalPakReader().Read(filePath);
+		pakResult = pak->Reader().TryRead(filePath, pakBytes);
+	}
+
+	if (pakResult == AssetPack::PakReader::ReadResult::Failed)
+	{
+		string warning = "AssetPack: パック内のテクスチャ読み込みに失敗しました (破損の可能性): " + filePath;
+		MessageBox(nullptr, warning.c_str(), "AssetPack Warning", MB_OK | MB_ICONWARNING);
 	}
 
 	DirectX::ScratchImage scratch;
 	HRESULT hr;
-	if (!pakBytes.empty())
+	if (pakResult == AssetPack::PakReader::ReadResult::Success)
 	{
 		hr = isHdr
 			? DirectX::LoadFromHDRMemory(pakBytes.data(), pakBytes.size(), nullptr, scratch)
@@ -158,14 +171,19 @@ bool Texture::LoadInternal(const string& filePath)
 
 bool Texture::IsLoadedOrPending(const string& key) const
 {
-	if (m_textureMap.find(key) != m_textureMap.end())
+	// m_textureMap/m_pendingTextures は BeginUpload() が正規化して格納したキー
+	// (AssetPack::NormalizePath 済み) を使っているので、ここも同じ正規化を通してから
+	// 比較する。素のキーのまま比較すると、大文字小文字や区切り文字の表記違いだけで
+	// 同じアセットが別キー扱いされ、二重ロード/二重アップロードが起こりうる。
+	const string normalizedKey = AssetPack::NormalizePath(key);
+	if (m_textureMap.find(normalizedKey) != m_textureMap.end())
 	{
 		return true;
 	}
 
 	for (const auto& pending : m_pendingTextures)
 	{
-		if (pending.key == key)
+		if (pending.key == normalizedKey)
 		{
 			return true;
 		}
@@ -188,7 +206,7 @@ bool Texture::BeginUpload(const string& key, const D3D12_RESOURCE_DESC& texDesc,
 	auto* cmdList = DirectX::DirectX12::Get()->GetCommandList(DirectX::DirectX12::CmdListType::Copy);
 
 	PendingTexture pending;
-	pending.key = key;
+	pending.key = AssetPack::NormalizePath(key);
 
 	// ------------------------------------------------------------
 	// 2. Defaultヒープにテクスチャ本体を作成(VRAM常駐)
@@ -336,12 +354,13 @@ bool Texture::CreateSRV(TextureData& data)
 
 D3D12_GPU_DESCRIPTOR_HANDLE Texture::GetSRVGpuHandle(const string& filePath)
 {
-	auto it = m_textureMap.find(filePath);
+	const string normalizedPath = AssetPack::NormalizePath(filePath);
+	auto it = m_textureMap.find(normalizedPath);
 	if (it == m_textureMap.end())
 	{
 		// 未確定(Flush前)のテクスチャが要求された場合はここで確定させる
 		Flush();
-		it = m_textureMap.find(filePath);
+		it = m_textureMap.find(normalizedPath);
 		if (it == m_textureMap.end())
 		{
 			return {};
@@ -354,11 +373,12 @@ D3D12_GPU_DESCRIPTOR_HANDLE Texture::GetSRVGpuHandle(const string& filePath)
 
 ID3D12Resource* Texture::GetTexture(const string& filePath)
 {
-	auto it = m_textureMap.find(filePath);
+	const string normalizedPath = AssetPack::NormalizePath(filePath);
+	auto it = m_textureMap.find(normalizedPath);
 	if (it == m_textureMap.end())
 	{
 		Flush();
-		it = m_textureMap.find(filePath);
+		it = m_textureMap.find(normalizedPath);
 		if (it == m_textureMap.end())
 		{
 			return nullptr;

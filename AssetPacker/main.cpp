@@ -4,7 +4,12 @@
 // 単一の .cpak アーカイブへ書き出すビルド時ツール。
 //
 // 使い方:
-//   AssetPacker.exe --input Assets --output Assets.cpak [--key-file pak.key] [--verify]
+//   AssetPacker.exe --generate-key project.key            (最初に1回、鍵を作る)
+//   AssetPacker.exe --input Assets --output Assets.cpak --key-file project.key [--verify]
+//
+// --key-file を省略すると既定では失敗する (公開されている DefaultKey() でうっかり
+// 出荷してしまうのを防ぐため)。テスト目的で意図的に既定鍵を使う場合のみ
+// --allow-default-key を付けること。
 //
 // 想定運用: 開発中の反復作業 (モデル差し替え等) はエンジン側がルーズファイルを
 // 直接読む前提のため、このツールは「配布ビルドを作る直前」に 1 回走らせるだけでよい。
@@ -30,7 +35,10 @@ namespace
 		std::string input = "Assets";
 		std::string output = "Assets.cpak";
 		std::string keyFile;
+		std::string generateKeyPath; // 空でなければ「鍵生成のみ」モード
 		bool verify = false;
+		bool allowDefaultKey = false;
+		bool showHelp = false;
 	};
 
 	bool ParseArgs(int argc, char** argv, Options& opt)
@@ -47,16 +55,12 @@ namespace
 			if (arg == "--input") { if (!next(opt.input)) return false; }
 			else if (arg == "--output") { if (!next(opt.output)) return false; }
 			else if (arg == "--key-file") { if (!next(opt.keyFile)) return false; }
+			else if (arg == "--generate-key") { if (!next(opt.generateKeyPath)) return false; }
+			else if (arg == "--allow-default-key") { opt.allowDefaultKey = true; }
 			else if (arg == "--verify") { opt.verify = true; }
 			else if (arg == "--help" || arg == "-h")
 			{
-				std::cout <<
-					"Usage: AssetPacker --input <dir> --output <file.cpak> [--key-file <key32.bin>] [--verify]\n"
-					"  --input      走査するルートフォルダ (既定: Assets)\n"
-					"  --output     出力 .cpak パス (既定: Assets.cpak)\n"
-					"  --key-file   32byte 生鍵ファイル。省略時は AssetPack::DefaultKey() を使用\n"
-					"               (本番配布では必ず自前の鍵を指定すること)\n"
-					"  --verify     書き出し直後に全エントリを読み戻してバイト一致を確認する\n";
+				opt.showHelp = true;
 				return false;
 			}
 			else
@@ -66,6 +70,28 @@ namespace
 			}
 		}
 		return true;
+	}
+
+	void PrintHelp()
+	{
+		std::cout <<
+			"Usage:\n"
+			"  AssetPacker --generate-key <path>\n"
+			"      32byte の乱数鍵を新規生成して <path> へ書き出し、終了する (パックは行わない)。\n"
+			"      鍵バイト列は Application/AssetPackKey.h の GetProjectPakKey() にも\n"
+			"      同じ値をコピーしておくこと (エンジン側が同じ鍵で復号できるようにするため)。\n"
+			"\n"
+			"  AssetPacker --input <dir> --output <file.cpak> --key-file <key32.bin> [--verify]\n"
+			"      --input             走査するルートフォルダ (既定: Assets)\n"
+			"      --output            出力 .cpak パス (既定: Assets.cpak)\n"
+			"      --key-file          32byte 生鍵ファイル (--generate-key で作成したもの)\n"
+			"      --allow-default-key --key-file を省略し、公開されている\n"
+			"                          AssetPackCore::DefaultKey() で意図的にパックする\n"
+			"                          (ローカルでの動作確認用。実配布では使わないこと)\n"
+			"      --verify            書き出し直後に全エントリを読み戻してバイト一致を確認する\n"
+			"\n"
+			"--key-file と --allow-default-key のどちらも指定しない場合はエラーで終了する\n"
+			"(公開鍵のまま気づかず配布してしまうのを防ぐため)。\n";
 	}
 
 	uint32_t TypeTagForExtension(const std::string& ext)
@@ -119,7 +145,27 @@ int main(int argc, char** argv)
 	Options opt;
 	if (!ParseArgs(argc, argv, opt))
 	{
+		if (opt.showHelp)
+		{
+			PrintHelp();
+			return 0;
+		}
 		return 1;
+	}
+
+	if (!opt.generateKeyPath.empty())
+	{
+		Key32 generated = GenerateRandomKey();
+		if (!SaveKeyFile(opt.generateKeyPath, generated))
+		{
+			std::cerr << "failed to write key file: " << opt.generateKeyPath << "\n";
+			return 1;
+		}
+		std::cout << "generated a new 32-byte key -> " << opt.generateKeyPath << "\n"
+			"copy its bytes into Application/AssetPackKey.h's GetProjectPakKey() as well,\n"
+			"then pack with: AssetPacker --input Assets --output Assets.cpak --key-file "
+			<< opt.generateKeyPath << "\n";
+		return 0;
 	}
 
 	if (!fs::exists(opt.input) || !fs::is_directory(opt.input))
@@ -138,10 +184,21 @@ int main(int argc, char** argv)
 		}
 		std::cout << "using key file: " << opt.keyFile << "\n";
 	}
+	else if (opt.allowDefaultKey)
+	{
+		std::cout << "warning: --allow-default-key given, packing with AssetPackCore's built-in\n"
+			"         DefaultKey(). This key is public (checked into source) and provides NO\n"
+			"         real protection -- do not ship a real build packed this way.\n";
+	}
 	else
 	{
-		std::cout << "warning: no --key-file given, using AssetPackCore's built-in DefaultKey().\n"
-			"         replace this before shipping a real build (see Keys.h).\n";
+		std::cerr << "error: no --key-file given.\n"
+			"       Packing with the public built-in DefaultKey() provides no real protection,\n"
+			"       so this refuses to run by default. Either:\n"
+			"         AssetPacker --generate-key project.key   (create a real key first)\n"
+			"       then pass --key-file project.key, or pass --allow-default-key to proceed\n"
+			"       anyway (e.g. for local testing only).\n";
+		return 1;
 	}
 
 	PakWriter writer;

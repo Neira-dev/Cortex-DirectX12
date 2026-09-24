@@ -13,15 +13,20 @@
   - `Keys.h/.cpp` — 既定鍵 / 鍵ファイルの読み書き
   - `PakWriter.h/.cpp` — 複数ファイルを1つの `.cpak` へ書き出す
   - `PakReader.h/.cpp` — `.cpak` を開いて仮想パス単位でメモリに読み出す
-  - `GlobalPak.h/.cpp` — プロセス全体で共有する `PakReader` シングルトン
-    (`TryOpenGlobalPak` / `IsGlobalPakOpen` / `GlobalPakReader`)。Mesh/Texture から参照される。
+  - `GlobalPak.h/.cpp` — プロセス全体で共有する `PakReader` を、`Mesh`/`Texture`/`Shader`
+    と同じ `static Get()`/`Del()` シングルトンの流儀で管理するクラス
+    (`AssetPack::GlobalPak::Get()->TryOpen(...)`/`IsOpen()`/`Reader()`)。
+    Mesh.cpp/Texture.cpp から `GlobalPak::Get()` 経由で参照される。
 - **AssetPacker** (コンソール exe): `AssetPackCore` を使うビルド時ツール。
   ```
-  AssetPacker.exe --input Assets --output Assets.cpak [--key-file pak.key] [--verify]
+  AssetPacker.exe --generate-key project.key
+  AssetPacker.exe --input Assets --output Assets.cpak --key-file project.key [--verify]
   ```
   `--input` 配下を再帰走査し、`.fbx/.obj/.gltf/.glb/.png/.jpg/.jpeg/.tga/.hdr/.dds` を
   仮想パス (例 `Assets/Models/Character.fbx`) のまま1つの `.cpak` に集約・暗号化する。
   `--verify` を付けると書き出し直後に全エントリを読み戻してバイト一致を確認する。
+  `--key-file` と `--allow-default-key` のどちらも指定しないとエラーで終了する
+  (公開されている `DefaultKey()` のまま気づかず配布ビルドを作ってしまう事故を防ぐため)。
 
 動作確認: 4構成 (Debug/Release × x64/Win32) すべてビルド確認済み。ダミーの `.fbx`/`.png` を
 `Assets/` 配下に置いて実際にパック→`--verify`→バイナリ内に元データが残っていないこと
@@ -49,26 +54,50 @@ pak 化とは無関係に行える。「差し替えるたびに pak 化」と�
 `Manager/Mesh.cpp` の `Mesh::Load` と `Manager/Texture.cpp` の `Texture::LoadInternal` を、
 `AssetPack::GlobalPak` 経由で pak を優先して読むように変更済み。
 
-- `Mesh::Load`: `AssetPack::IsGlobalPakOpen() && GlobalPakReader().Has(FILEPATH)` が真なら
-  `GlobalPakReader().Read(FILEPATH)` で得たバイト列を `Assimp::Importer::ReadFileFromMemory`
-  に渡す。それ以外 (pak 未オープン、または該当パスが無い) は従来通り `ReadFile` でルーズ
-  ファイルを読む。
-- `Texture::LoadInternal`: 同様に pak にあれば `DirectX::LoadFromWICMemory` /
-  `LoadFromHDRMemory` を、無ければ従来通り `LoadFromWICFile` / `LoadFromHDRFile` を使う。
+- `Mesh::Load`: `AssetPack::GlobalPak::Get()->Reader().TryRead(FILEPATH, pakBytes)` の結果
+  (`ReadResult::Success`/`Failed`/`NotFound`) を見て、`Success` なら
+  `Assimp::Importer::ReadFileFromMemory` に渡す。`NotFound` (pak 未オープン、または
+  該当パスが無い) は従来通り `ReadFile` でルーズファイルを読む。`Failed` (pak には
+  あるのに読み込み自体が失敗 = 破損の可能性) はルーズファイルへフォールバックしつつ、
+  `NotFound` と区別して警告ダイアログを出す。
+- `Texture::LoadInternal`: 同様に `TryRead` の結果に応じて `DirectX::LoadFromWICMemory` /
+  `LoadFromHDRMemory` (`Success`) か `LoadFromWICFile` / `LoadFromHDRFile` (`NotFound`) を
+  使い分け、`Failed` は警告を出す。
 
-`Application/Template.cpp` の `TemplateMain` 冒頭 (`/* 初期化 */` ブロックの先頭、Window 初期化より前)
-で `AssetPack::TryOpenGlobalPak("Assets.cpak")` を呼ぶように実装済み。鍵は既定引数の
-`AssetPack::DefaultKey()` を使っている。
+### 鍵の配線 (実施済み)
+
+`Application/AssetPackKey.h` にプロジェクト固有の鍵を置く場所を用意した。
+`Application/Template.cpp` の `TemplateMain` 冒頭 (`/* 初期化 */` ブロックの先頭、Window
+初期化より前) で `AppAssetPack::GetProjectPakKey()` を明示的に取得し、
+`AssetPack::GlobalPak::Get()->TryOpen("Assets.cpak", pakKey)` へ渡す
+(`AssetPackCore::DefaultKey()` の既定引数には依存しない)。
 
 - リポジトリルート (デバッグ実行時の作業ディレクトリ) に `Assets.cpak` が無ければ `Open()` は
   false を返すだけで何も起きない → 今まで通りルーズファイル運用のまま動く。
-- `AssetPacker --output Assets.cpak` で生成した pak をルートに置けば、以後の `Mesh::Load` /
-  `Texture::LoadInternal` が自動的にそちらを優先する。
-- 本番配布で `--key-file` により独自鍵を使った場合は、`Template.cpp` 側の
-  `TryOpenGlobalPak("Assets.cpak")` 呼び出しにも同じ鍵を渡すよう変更が必要
-  (現状は両方とも `DefaultKey()` 決め打ち)。
+- 実際の配布ビルドを作る手順:
+  1. `AssetPacker --generate-key project.key` で32byteの乱数鍵を生成 (リポジトリには
+     コミットしないこと)
+  2. `project.key` の中身を `Application/AssetPackKey.h` の `GetProjectPakKey()` に
+     コピーする
+  3. `AssetPacker --input Assets --output Assets.cpak --key-file project.key` でパックする
+- `AssetPackKey.h` の鍵が未カスタマイズ (`AssetPackCore::DefaultKey()` のまま) だと、
+  Release ビルド起動時に警告ダイアログが出る (Debug では出さない)。
+- `AssetPacker` は `--key-file` か `--allow-default-key` のどちらかを明示しないとエラーで
+  終了するようにした。うっかり公開鍵のまま配布ビルドを作ってしまう事故を防ぐため。
 
-動作確認: `Manager.vcxproj` 経由のフルビルドは `ThirdParty/DirectXTex` の shader 事前生成
-(`Shaders/Compiled/*.inc`) が本環境に無いため通せなかった (既知の環境依存問題、今回の変更とは
-無関係)。代わりに `cl.exe /c` で `Mesh.cpp`/`Texture.cpp` を実際の include パス一式を渡して
-直接コンパイルし、警告・エラーなしで通ることを確認済み。
+動作確認: `Manager.vcxproj`/`Application.vcxproj` 経由のフルビルドは `ThirdParty/DirectXTex`
+の shader 事前生成 (`Shaders/Compiled/*.inc`) が本環境に無いため通せなかった (既知の環境依存
+問題、今回の変更とは無関係)。代わりに `cl.exe /c` で `Mesh.cpp`/`Texture.cpp`/`Template.cpp`
+(Debug/Release 両方の `_DEBUG` 分岐) を実際の include パス一式を渡して直接コンパイルし、
+警告・エラーなしで通ることを確認済み。`AssetPacker` の新しい鍵フロー
+(`--generate-key` → `--key-file` でパック、`--key-file`/`--allow-default-key` 省略時のエラー、
+`--allow-default-key` 指定時の動作) は実行して確認済み。
+
+追加で確認したもの:
+- `PakReader::Open()` の再オープン安全性 (失敗しても直前の有効な pak を保持したままになる)
+- `PakReader::TryRead()` の3状態 (`NotFound`/`Failed`/`Success`、0byte の正規エントリと
+  読み込み失敗を区別できる)
+- `PakWriter::WriteTo()` を in-place 暗号化に書き換えた後もパック→検証が正しく動作し、
+  出力バイナリに平文が残っていないこと (`.cpak` から元データの grep がヒットしないこと)
+- `GlobalPak` を `Get()`/`Del()` シングルトンへ書き換えた後の `Mesh.cpp`/`Texture.cpp`/
+  `Template.cpp` の直接コンパイル
