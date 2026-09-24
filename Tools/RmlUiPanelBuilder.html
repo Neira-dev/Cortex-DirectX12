@@ -1,0 +1,1744 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RmlUi Panel Builder</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&display=swap">
+<style>
+  :root{
+    --bg:#14171b;
+    --surface:#1b1f25;
+    --surface-2:#232933;
+    --surface-3:#2b323d;
+    --border:#313945;
+    --border-soft:#262c35;
+    --text:#e8e6e1;
+    --text-dim:#939bab;
+    --text-faint:#5f6779;
+    --accent:#e8a33d;
+    --accent-soft:#3a2e18;
+    --accent-ink:#1a1200;
+    --good:#5ec98f;
+    --good-soft:#17301f;
+    --danger:#e2685f;
+    --danger-soft:#331b19;
+    --sans:'Manrope',system-ui,-apple-system,'Segoe UI',sans-serif;
+    --mono:'JetBrains Mono',ui-monospace,'SFMono-Regular',Menlo,monospace;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--sans);
+    height:100vh;
+    overflow:hidden;
+  }
+  button{font-family:var(--sans);}
+  input,select,textarea{font-family:var(--sans);}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+
+  .app{display:flex;flex-direction:column;height:100vh;}
+
+  /* ---- topbar ---- */
+  .topbar{
+    display:flex;align-items:center;gap:14px;
+    height:52px;flex:0 0 52px;
+    padding:0 16px;
+    background:var(--surface);
+    border-bottom:1px solid var(--border);
+  }
+  .brand{display:flex;align-items:center;gap:9px;flex:0 0 auto;}
+  .brand-mark{
+    width:26px;height:26px;border-radius:7px;
+    background:linear-gradient(155deg,var(--accent),#c97e22);
+    display:flex;align-items:center;justify-content:center;
+    font-family:var(--mono);font-weight:600;font-size:13px;color:var(--accent-ink);
+  }
+  .brand-text{font-weight:800;font-size:14.5px;letter-spacing:.01em;}
+  .brand-sub{font-family:var(--mono);font-size:10.5px;color:var(--text-faint);margin-left:2px;}
+
+  .save-indicator{font-size:10.5px;color:var(--text-faint);font-family:var(--mono);white-space:nowrap;}
+  .save-indicator.fresh{color:var(--good);}
+
+  .topbar-actions{margin-left:auto;display:flex;gap:8px;flex:0 0 auto;}
+  .btn{
+    appearance:none;border:1px solid var(--border);background:var(--surface-2);
+    color:var(--text);border-radius:7px;padding:7px 13px;font-size:12.5px;font-weight:600;
+    cursor:pointer;transition:background .12s,border-color .12s;white-space:nowrap;
+  }
+  .btn:hover{background:var(--surface-3);border-color:var(--text-faint);}
+  .btn-accent{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);}
+  .btn-accent:hover{background:#f0ae4c;border-color:#f0ae4c;}
+  .btn-small{padding:5px 10px;font-size:11.5px;border-radius:6px;}
+  .btn-danger-ghost{
+    appearance:none;border:1px solid var(--danger);background:transparent;color:var(--danger);
+    border-radius:6px;padding:5px 10px;font-size:11.5px;font-weight:600;cursor:pointer;
+  }
+  .btn-danger-ghost:hover{background:var(--danger-soft);}
+  .btn-ghost-small{
+    appearance:none;border:1px solid var(--border);background:transparent;color:var(--text-dim);
+    border-radius:6px;padding:5px 9px;font-size:11px;font-weight:600;cursor:pointer;
+  }
+  .btn-ghost-small:hover{border-color:var(--accent);color:var(--text);}
+
+  /* ---- screen tabs ---- */
+  .screen-bar{
+    display:flex;align-items:center;gap:6px;height:38px;flex:0 0 38px;
+    padding:0 16px;background:var(--surface);border-bottom:1px solid var(--border);
+    overflow-x:auto;
+  }
+  .screen-tabs{display:flex;align-items:center;gap:6px;}
+  .screen-tab{
+    display:flex;align-items:center;gap:7px;
+    background:var(--surface-2);border:1px solid var(--border-soft);border-radius:6px;
+    padding:5px 6px 5px 11px;cursor:pointer;flex:0 0 auto;
+  }
+  .screen-tab:hover{border-color:var(--text-faint);}
+  .screen-tab.active{background:var(--accent-soft);border-color:var(--accent);}
+  .screen-tab-name{font-size:12px;font-weight:600;color:var(--text-dim);white-space:nowrap;}
+  .screen-tab.active .screen-tab-name{color:var(--text);}
+  .screen-tab-close{
+    appearance:none;border:none;background:none;color:var(--text-faint);
+    font-size:13px;line-height:1;cursor:pointer;padding:2px 5px;border-radius:4px;
+  }
+  .screen-tab-close:hover{background:var(--danger-soft);color:var(--danger);}
+  .screen-tab-add{
+    appearance:none;border:1px dashed var(--border);background:none;color:var(--text-faint);
+    border-radius:6px;width:26px;height:26px;cursor:pointer;font-size:15px;flex:0 0 auto;
+  }
+  .screen-tab-add:hover{border-color:var(--accent);color:var(--accent);}
+  .screen-hint{font-size:10.5px;color:var(--text-faint);margin-left:8px;white-space:nowrap;}
+
+  /* ---- import panel ---- */
+  .import-panel{
+    display:none;flex-direction:column;gap:10px;
+    padding:14px 16px;background:var(--surface);border-bottom:1px solid var(--border);
+  }
+  .import-panel.open{display:flex;}
+  .import-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .import-col{display:flex;flex-direction:column;gap:5px;}
+  .import-col label{font-size:11px;font-weight:700;color:var(--text-dim);}
+  .import-col textarea{
+    background:var(--surface-2);border:1px solid var(--border);color:var(--text);
+    border-radius:6px;padding:8px;font-family:var(--mono);font-size:11px;resize:vertical;
+    min-height:90px;
+  }
+  .import-actions{display:flex;align-items:center;gap:10px;}
+  .import-note{font-size:10.5px;color:var(--text-faint);}
+
+  /* ---- workbench ---- */
+  .workbench{
+    flex:1 1 auto;min-height:0;
+    display:grid;grid-template-columns:var(--palette-w,228px) 6px 1fr 6px var(--inspector-w,322px);
+  }
+  aside,main{min-height:0;min-width:0;overflow:hidden;}
+
+  .resize-col-handle{
+    cursor:col-resize;background:var(--border-soft);position:relative;
+  }
+  .resize-col-handle:hover,.resize-col-handle.dragging{background:var(--accent);}
+  .resize-col-handle::after{content:'';position:absolute;top:0;bottom:0;left:-4px;right:-4px;}
+
+  .pane-title{
+    font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
+    color:var(--text-faint);padding:14px 14px 8px;
+  }
+
+  /* ---- palette ---- */
+  .palette{background:var(--surface);border-right:1px solid var(--border);overflow-y:auto;}
+  .palette-list{display:flex;flex-direction:column;gap:6px;padding:0 12px 14px;}
+  .palette-btn{
+    display:flex;align-items:center;gap:9px;
+    background:var(--surface-2);border:1px solid var(--border-soft);border-radius:8px;
+    padding:8px 10px;cursor:pointer;text-align:left;color:var(--text);
+    transition:background .12s,border-color .12s,transform .08s;
+  }
+  .palette-btn:hover{background:var(--surface-3);border-color:var(--accent);}
+  .palette-btn:active{transform:scale(.98);}
+  .tag-badge{
+    font-family:var(--mono);font-size:10.5px;font-weight:600;color:var(--accent);
+    background:var(--accent-soft);border-radius:4px;padding:2.5px 6px;flex:0 0 auto;
+    min-width:44px;text-align:center;
+  }
+  .tag-badge.small{min-width:38px;font-size:9.5px;padding:2px 5px;}
+  .palette-label{font-size:12.5px;font-weight:600;}
+
+  .parent-picker{padding:2px 14px 14px;}
+  .parent-picker label{display:block;font-size:11px;color:var(--text-dim);margin-bottom:5px;}
+  .parent-picker select{
+    width:100%;background:var(--surface-2);border:1px solid var(--border);color:var(--text);
+    border-radius:6px;padding:7px 8px;font-size:12px;
+  }
+
+  .layers{border-top:1px solid var(--border-soft);}
+  .layer-list{display:flex;flex-direction:column;padding:0 8px 14px;}
+  .layer-row{
+    display:flex;align-items:center;gap:7px;
+    padding:6px 6px;border-radius:6px;cursor:pointer;
+    border:1px solid transparent;
+  }
+  .layer-row:hover{background:var(--surface-2);}
+  .layer-row.selected{background:var(--accent-soft);border-color:var(--accent);}
+  .layer-name{font-family:var(--mono);font-size:11.5px;color:var(--text-dim);flex:1;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .layer-row.selected .layer-name{color:var(--text);}
+  .layer-del{
+    appearance:none;border:none;background:none;color:var(--text-faint);
+    font-size:14px;line-height:1;cursor:pointer;padding:2px 4px;border-radius:4px;flex:0 0 auto;
+  }
+  .layer-del:hover{background:var(--danger-soft);color:var(--danger);}
+  .layers-empty{padding:6px 14px 14px;font-size:11.5px;color:var(--text-faint);line-height:1.6;}
+
+  /* ---- canvas viewport ---- */
+  .viewport{display:flex;flex-direction:column;background:var(--bg);min-width:0;}
+  .viewport-toolbar{
+    display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+    padding:8px 16px;border-bottom:1px solid var(--border);background:var(--surface);
+    flex:0 0 auto;
+  }
+  .vt-group{display:flex;align-items:center;gap:6px;}
+  .vt-group label{font-size:10.5px;color:var(--text-faint);}
+  .vt-group input[type=number]{
+    width:58px;background:var(--surface-2);border:1px solid var(--border);color:var(--text);
+    border-radius:5px;padding:4px 6px;font-size:11.5px;font-family:var(--mono);
+  }
+  .vt-group select{
+    background:var(--surface-2);border:1px solid var(--border);color:var(--text);
+    border-radius:5px;padding:4px 6px;font-size:11px;
+  }
+  .vt-x{color:var(--text-faint);font-size:11px;}
+  .swatches{display:flex;gap:7px;margin-left:auto;align-items:center;}
+  .swatches-label{font-size:11px;color:var(--text-faint);margin-right:2px;}
+  .swatch{
+    width:20px;height:20px;border-radius:5px;border:2px solid transparent;cursor:pointer;
+    box-shadow:inset 0 0 0 1px rgba(0,0,0,.35);
+  }
+  .swatch.active{border-color:var(--accent);}
+
+  .canvas-scroll{flex:1;overflow:auto;display:flex;align-items:flex-start;justify-content:center;padding:28px;}
+  .canvas-frame{
+    flex:0 0 auto;
+    box-shadow:0 18px 44px rgba(0,0,0,.45),0 0 0 1px var(--border);
+    border-radius:3px;overflow:hidden;
+  }
+  #canvas-root{position:relative;overflow:hidden;}
+
+  .el-box{
+    position:absolute;box-sizing:border-box;cursor:grab;
+    display:flex;overflow:hidden;
+    outline:1px dashed transparent;
+  }
+  .el-box:hover{outline-color:rgba(232,163,61,.55);}
+  .el-box.selected{outline:1.5px solid var(--accent);outline-style:solid;}
+  .el-box.img-placeholder{
+    background-image:repeating-linear-gradient(45deg,rgba(255,255,255,.06) 0 6px,transparent 6px 12px);
+    align-items:center;justify-content:center;text-align:center;
+  }
+  .el-box .el-label{
+    position:absolute;top:-19px;left:-1.5px;
+    font-family:var(--mono);font-size:9.5px;font-weight:600;color:var(--accent-ink);
+    background:var(--accent);padding:1.5px 5px;border-radius:3px 3px 0 0;
+    white-space:nowrap;pointer-events:none;
+    opacity:0;transition:opacity .1s;
+  }
+  .el-box.selected .el-label,.el-box:hover .el-label{opacity:1;}
+  .resize-handle{
+    position:absolute;right:-4px;bottom:-4px;width:10px;height:10px;
+    background:var(--accent);border-radius:2px;cursor:nwse-resize;
+    display:none;
+  }
+  .el-box.selected .resize-handle{display:block;}
+  .empty-canvas-hint{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    font-size:12.5px;color:var(--text-faint);pointer-events:none;text-align:center;padding:20px;
+  }
+
+  /* ---- inspector ---- */
+  .inspector{background:var(--surface);border-left:1px solid var(--border);
+    display:flex;flex-direction:column;min-height:0;}
+  .inspector-scroll{overflow-y:auto;flex:1 1 auto;min-height:80px;}
+
+  .resize-row-handle{
+    cursor:row-resize;background:var(--border-soft);position:relative;flex:0 0 auto;height:6px;
+  }
+  .resize-row-handle:hover,.resize-row-handle.dragging{background:var(--accent);}
+  .resize-row-handle::after{content:'';position:absolute;left:0;right:0;top:-4px;bottom:-4px;}
+  .inspector-empty{padding:16px 14px;font-size:12px;color:var(--text-faint);line-height:1.7;}
+  .inspector-body{padding:0 14px 16px;display:flex;flex-direction:column;gap:12px;}
+  .inspector-head{display:flex;align-items:center;justify-content:space-between;padding:2px 0 2px;gap:6px;}
+  .inspector-head-actions{display:flex;gap:5px;}
+  .field{display:flex;flex-direction:column;gap:5px;}
+  .field label{font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text-faint);}
+  .field input[type=text],.field input[type=number],.field select{
+    background:var(--surface-2);border:1px solid var(--border);color:var(--text);
+    border-radius:6px;padding:7px 9px;font-size:12.5px;font-family:var(--mono);width:100%;
+  }
+  .field input:focus,.field select:focus{border-color:var(--accent);}
+  .field-row{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
+  .color-row{display:flex;align-items:center;gap:8px;}
+  .color-row input[type=color]{
+    width:34px;height:30px;padding:0;border:1px solid var(--border);border-radius:6px;background:none;cursor:pointer;
+  }
+  .color-row input[type=number]{width:64px;flex:0 0 auto;}
+  .color-row .hint{font-size:10px;color:var(--text-faint);}
+  .divider{height:1px;background:var(--border-soft);margin:2px 0;}
+
+  .anchor-grid{
+    display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:5px;
+    width:64px;height:64px;padding:6px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;
+  }
+  .anchor-btn{
+    appearance:none;border:1px solid var(--border-soft);background:var(--surface-3);border-radius:4px;
+    cursor:pointer;position:relative;
+  }
+  .anchor-btn::after{
+    content:'';position:absolute;width:5px;height:5px;border-radius:50%;background:var(--text-faint);
+  }
+  .anchor-btn[data-ax=left][data-ay=top]::after{top:4px;left:4px;}
+  .anchor-btn[data-ax=right][data-ay=top]::after{top:4px;right:4px;}
+  .anchor-btn[data-ax=left][data-ay=bottom]::after{bottom:4px;left:4px;}
+  .anchor-btn[data-ax=right][data-ay=bottom]::after{bottom:4px;right:4px;}
+  .anchor-btn:hover{border-color:var(--accent);}
+  .anchor-btn.active{background:var(--accent-soft);border-color:var(--accent);}
+  .anchor-btn.active::after{background:var(--accent);}
+  .anchor-field{display:flex;align-items:center;gap:12px;}
+  .anchor-field-info{font-size:10.5px;color:var(--text-faint);line-height:1.6;}
+
+  .toggle-row{display:flex;align-items:center;gap:8px;}
+  .toggle-row input[type=checkbox]{width:15px;height:15px;accent-color:var(--accent);cursor:pointer;}
+  .toggle-row label{font-size:11.5px;font-weight:600;color:var(--text);text-transform:none;letter-spacing:0;}
+  .hover-fields{display:flex;flex-direction:column;gap:10px;padding:10px;background:var(--surface-2);
+    border:1px solid var(--border-soft);border-radius:8px;}
+
+  /* ---- code output ---- */
+  .code-panel{border-top:1px solid var(--border);flex:0 0 var(--code-h,300px);display:flex;flex-direction:column;min-height:120px;}
+  .code-tabs{display:flex;border-bottom:1px solid var(--border-soft);flex:0 0 auto;}
+  .code-tab{
+    appearance:none;border:none;background:none;color:var(--text-dim);
+    font-size:11px;font-weight:700;font-family:var(--mono);padding:9px 11px;cursor:pointer;
+    border-bottom:2px solid transparent;
+  }
+  .code-tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+  .code-body{flex:1;min-height:0;overflow:hidden;position:relative;}
+  .code-body pre,.code-body textarea{
+    margin:0;padding:44px 14px 40px;font-family:var(--mono);font-size:12.5px;line-height:1.7;
+    color:#c9d6e3;white-space:pre;
+    width:100%;height:100%;box-sizing:border-box;overflow:auto;display:block;
+  }
+  .code-body textarea{border:none;outline:none;resize:none;background:transparent;}
+  .code-body textarea[readonly]{cursor:default;}
+  .code-body pre.wrap,.code-body textarea.wrap{white-space:pre-wrap;word-break:break-all;}
+  .code-actions{
+    position:absolute;top:8px;right:10px;z-index:2;
+    display:flex;gap:6px;
+  }
+  .code-edit-hint{
+    position:absolute;top:11px;left:14px;z-index:2;font-size:10px;font-weight:700;
+    color:var(--accent);
+    background:var(--surface-2);border:1px solid var(--border-soft);border-radius:5px;padding:2px 7px;
+    max-width:min(60%,340px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:help;
+  }
+  .code-copy{
+    appearance:none;border:1px solid var(--border);background:var(--surface-2);color:var(--text);
+    border-radius:6px;padding:5px 11px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;
+  }
+  .code-copy:hover{border-color:var(--accent);}
+  .code-copy.copied{background:var(--good-soft);border-color:var(--good);color:var(--good);}
+  .code-copy.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);}
+  .save-hint{padding:8px 14px;font-size:10.5px;color:var(--text-faint);border-top:1px solid var(--border-soft);font-family:var(--mono);line-height:1.6;}
+  .save-hint .local-note{color:var(--text-dim);font-family:var(--sans);}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-mark">Rml</div>
+      <div class="brand-text">RmlUi Panel Builder</div>
+      <div class="brand-sub">Cortex Assets/UI/</div>
+    </div>
+    <div class="save-indicator" id="save-indicator">未保存</div>
+    <div class="topbar-actions">
+      <button class="btn" id="btn-import-toggle">既存ファイルを取り込む</button>
+      <button class="btn" id="btn-load-hierarchy">Hierarchy 例を追加</button>
+      <button class="btn" id="btn-load-demo">Cortex デモを追加</button>
+    </div>
+  </div>
+
+  <div class="import-panel" id="import-panel">
+    <div class="import-row">
+      <div class="import-col">
+        <label>RML を貼り付け</label>
+        <textarea id="import-rml" placeholder="&lt;rml&gt;...&lt;/rml&gt; の内容を貼り付け"></textarea>
+      </div>
+      <div class="import-col">
+        <label>RCSS を貼り付け (任意)</label>
+        <textarea id="import-rcss" placeholder="body/#id セレクタのスタイルを貼り付け (省略可)"></textarea>
+      </div>
+    </div>
+    <div class="import-actions">
+      <button class="btn btn-accent" id="btn-import-apply">新規スクリーンとして取り込む</button>
+      <span class="import-note">ベストエフォート変換です。div/ul/li/h1/p/button/input/img と #id セレクタの基本プロパティのみ対応。取り込み後に位置調整してください。</span>
+    </div>
+  </div>
+
+  <div class="screen-bar">
+    <div class="screen-tabs" id="screen-tabs"></div>
+    <span class="screen-hint">画面(スクリーン)ごとに独立したキャンバスを持てます。HUD・メインメニュー・設定画面など</span>
+  </div>
+
+  <div class="workbench">
+    <aside class="palette">
+      <div class="pane-title">要素を追加</div>
+      <div class="palette-list" id="palette-list"></div>
+      <div class="parent-picker">
+        <label>追加先</label>
+        <select id="parent-select"></select>
+      </div>
+      <div class="layers">
+        <div class="pane-title">レイヤー</div>
+        <div class="layer-list" id="layer-list"></div>
+      </div>
+    </aside>
+
+    <div class="resize-col-handle" id="handle-left" title="ドラッグしてサイズ調整"></div>
+
+    <main class="viewport">
+      <div class="viewport-toolbar">
+        <div class="vt-group">
+          <label>タイトル</label>
+          <input type="text" id="f-doctitle" style="width:120px;background:var(--surface-2);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:4px 7px;font-size:11.5px;">
+        </div>
+        <div class="vt-group">
+          <label>ファイル名</label>
+          <input type="text" id="f-filename" style="width:90px;background:var(--surface-2);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:4px 7px;font-size:11.5px;font-family:var(--mono);">
+        </div>
+        <div class="vt-group">
+          <label>キャンバス</label>
+          <input type="number" id="f-canvas-w" min="64" max="7680">
+          <span class="vt-x">×</span>
+          <input type="number" id="f-canvas-h" min="64" max="4320">
+          <select id="canvas-preset">
+            <option value="">プリセット</option>
+            <option value="720x480">720×480 (Cortex)</option>
+            <option value="1280x720">1280×720 (HD)</option>
+            <option value="1920x1080">1920×1080 (Full HD)</option>
+            <option value="1080x1920">1080×1920 (縦)</option>
+          </select>
+        </div>
+        <div class="swatches">
+          <span class="swatches-label">背景プレビュー</span>
+          <div class="swatch" data-bg="cyan" style="background:#00ffff" title="Cortex 既定クリア色 (シアン)"></div>
+          <div class="swatch" data-bg="dark" style="background:#1a1a1a" title="ダーク"></div>
+          <div class="swatch" data-bg="light" style="background:#f2f2f2" title="ライト"></div>
+        </div>
+      </div>
+      <div class="canvas-scroll">
+        <div class="canvas-frame">
+          <div id="canvas-root"></div>
+        </div>
+      </div>
+    </main>
+
+    <div class="resize-col-handle" id="handle-right" title="ドラッグしてサイズ調整"></div>
+
+    <aside class="inspector">
+      <div class="inspector-scroll">
+        <div class="pane-title">プロパティ</div>
+        <div id="inspector-content"></div>
+      </div>
+
+      <div class="resize-row-handle" id="handle-code" title="ドラッグしてコード欄の高さを調整"></div>
+
+      <div class="code-panel">
+        <div class="code-tabs">
+          <button class="code-tab active" data-tab="rml">.rml</button>
+          <button class="code-tab" data-tab="rcss">.rcss</button>
+          <button class="code-tab" data-tab="json">project.json</button>
+        </div>
+        <div class="code-body">
+          <span class="code-edit-hint" id="code-edit-hint" style="display:none;">直接編集中</span>
+          <div class="code-actions">
+            <button class="code-copy" id="btn-wrap" title="長い行を折り返して表示">折り返し</button>
+            <button class="code-copy" id="btn-download-both">.rml+.rcss 保存</button>
+            <button class="code-copy" id="btn-download">このタブを保存</button>
+            <button class="code-copy" id="btn-copy">コピー</button>
+          </div>
+          <textarea id="code-output" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off"></textarea>
+        </div>
+        <div class="save-hint" id="save-hint"></div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var STORAGE_KEY = 'rmlui-panel-builder-v2';
+
+  var TAG_DEFS = [
+    {tag:'div',    label:'コンテナ',   defW:200, defH:120, hasText:false, hasSrc:false},
+    {tag:'ul',     label:'リスト',     defW:220, defH:160, hasText:false, hasSrc:false},
+    {tag:'li',     label:'リスト項目', defW:200, defH:30,  hasText:true,  hasSrc:false, defText:'リスト項目'},
+    {tag:'h1',     label:'見出し',     defW:240, defH:30,  hasText:true,  hasSrc:false, defText:'見出しテキスト'},
+    {tag:'p',      label:'段落',       defW:240, defH:22,  hasText:true,  hasSrc:false, defText:'本文テキスト'},
+    {tag:'button', label:'ボタン',     defW:140, defH:38,  hasText:true,  hasSrc:false, defText:'ボタン'},
+    {tag:'input',  label:'入力欄',     defW:160, defH:28,  hasText:true,  hasSrc:false, defText:''},
+    {tag:'img',    label:'画像',       defW:96,  defH:96,  hasText:false, hasSrc:true}
+  ];
+  var ID_PREFIX = {div:'panel',ul:'list',li:'item',h1:'heading',p:'paragraph',button:'button',input:'input',img:'image'};
+
+  function tagDef(tag){ for(var i=0;i<TAG_DEFS.length;i++) if(TAG_DEFS[i].tag===tag) return TAG_DEFS[i]; return TAG_DEFS[0]; }
+
+  var screens = [];
+  var activeScreenId = null;
+  var selectedId = null;
+  var dragState = null;
+  var activeTab = 'rml';
+  var saveTimer = null;
+
+  function activeScreen(){
+    for (var i=0;i<screens.length;i++) if (screens[i].id===activeScreenId) return screens[i];
+    return screens[0] || null;
+  }
+  function children(parentId){
+    var scr = activeScreen();
+    if (!scr) return [];
+    return scr.elements.filter(function(e){ return e.parentId === parentId; });
+  }
+  function findEl(id){
+    var scr = activeScreen();
+    if (!scr) return null;
+    for (var i=0;i<scr.elements.length;i++) if (scr.elements[i].id===id) return scr.elements[i];
+    return null;
+  }
+  function descendantsOf(id){
+    var out = [];
+    children(id).forEach(function(c){ out.push(c.id); out = out.concat(descendantsOf(c.id)); });
+    return out;
+  }
+  function newScreenId(){ return 'scr' + Math.random().toString(36).slice(2,9); }
+
+  function defaultStyleFor(tag){
+    var base = {
+      anchorX:'left', anchorY:'top', x:40, y:40,
+      width:tagDef(tag).defW, height:tagDef(tag).defH,
+      fontSize:14, padding:0, radius:0, textAlign:'left',
+      hoverEnabled:false, hoverBgColor:'#4a84c4', hoverTextColor:'#ffffff'
+    };
+    if (tag==='button') return Object.assign(base, {bgColor:'#3a6ea5',bgAlpha:255,textColor:'#ffffff',padding:8,radius:4,textAlign:'center'});
+    if (tag==='div' || tag==='ul') return Object.assign(base, {bgColor:'#1c2530',bgAlpha:220,textColor:'#e8e6e1',padding:12,radius:8});
+    if (tag==='input')  return Object.assign(base, {bgColor:'#ffffff',bgAlpha:255,textColor:'#111111',fontSize:13,padding:6,radius:2});
+    if (tag==='img')    return Object.assign(base, {bgColor:'#000000',bgAlpha:0,textColor:'#8b93a1'});
+    return Object.assign(base, {bgColor:'#000000',bgAlpha:0,textColor:'#e8e6e1',fontSize: tag==='h1'?22:14});
+  }
+
+  function makeBlankScreen(name){
+    return {
+      id:newScreenId(), name:name||'新規スクリーン', filename:'screen', title:'Untitled',
+      canvasW:720, canvasH:480, canvasBg:'cyan',
+      elements:[], nextNum:{div:0,ul:0,li:0,h1:0,p:0,button:0,input:0,img:0}, uidCounter:1
+    };
+  }
+
+  function addElement(tag, parentId){
+    var scr = activeScreen();
+    scr.nextNum[tag] = (scr.nextNum[tag]||0) + 1;
+    var el = {
+      id: 'u' + (scr.uidCounter++),
+      tag: tag,
+      parentId: parentId || null,
+      idAttr: ID_PREFIX[tag] + '-' + scr.nextNum[tag],
+      className: '',
+      text: tagDef(tag).defText || '',
+      src: tag==='img' ? '' : '',
+      rawContent: false,   // true の場合 text をエスケープせずそのまま出力 ({{ hp }} 等のデータバインディング用)
+      customAttrs: '',     // 開始タグへそのまま挿入する生の属性文字列 (data-if="hp > 0" 等)
+      style: defaultStyleFor(tag)
+    };
+    var siblingCount = children(parentId||null).length;
+    el.style.x = (parentId ? 12 : 40) + (siblingCount%4)*18;
+    el.style.y = (parentId ? 12 : 40) + siblingCount*(parentId?32:22);
+    scr.elements.push(el);
+    selectedId = el.id;
+    renderFull();
+    scheduleSave();
+  }
+
+  function deleteElement(id){
+    var scr = activeScreen();
+    var toRemove = [id].concat(descendantsOf(id));
+    scr.elements = scr.elements.filter(function(e){ return toRemove.indexOf(e.id) === -1; });
+    if (toRemove.indexOf(selectedId) !== -1) selectedId = null;
+    renderFull();
+    scheduleSave();
+  }
+
+  function duplicateElement(id){
+    var scr = activeScreen();
+    var src = findEl(id);
+    if (!src) return;
+    var rootClone = null;
+    function cloneRec(elId, newParentId){
+      var orig = findEl(elId);
+      var clone = JSON.parse(JSON.stringify(orig));
+      clone.id = 'u' + (scr.uidCounter++);
+      clone.parentId = newParentId;
+      clone.idAttr = orig.idAttr ? orig.idAttr + '-copy' : '';
+      scr.elements.push(clone);
+      if (!rootClone) rootClone = clone;
+      children(elId).forEach(function(c){ cloneRec(c.id, clone.id); });
+      return clone;
+    }
+    cloneRec(id, src.parentId);
+    rootClone.style.x += 16; rootClone.style.y += 16;
+    selectedId = rootClone.id;
+    renderFull();
+    scheduleSave();
+  }
+
+  function bringToFront(id){
+    var scr = activeScreen();
+    var idx = scr.elements.findIndex(function(e){ return e.id===id; });
+    if (idx<0) return;
+    var el = scr.elements.splice(idx,1)[0];
+    scr.elements.push(el);
+    renderFull(); scheduleSave();
+  }
+  function sendToBack(id){
+    var scr = activeScreen();
+    var idx = scr.elements.findIndex(function(e){ return e.id===id; });
+    if (idx<0) return;
+    var el = scr.elements.splice(idx,1)[0];
+    scr.elements.unshift(el);
+    renderFull(); scheduleSave();
+  }
+
+  function selectElement(id){ selectedId = id; renderFull(); }
+
+  function updateField(key, value){
+    var el = findEl(selectedId);
+    if(!el) return;
+    if (key==='idAttr' || key==='className' || key==='text' || key==='src' || key==='customAttrs'){
+      el[key] = value;
+    } else if (key==='rawContent'){
+      el.rawContent = !!value;
+    } else if (key==='textAlign' || key==='bgColor' || key==='textColor' || key==='hoverBgColor' || key==='hoverTextColor'){
+      el.style[key] = value;
+    } else if (key==='hoverEnabled'){
+      el.style.hoverEnabled = !!value;
+    } else {
+      var num = parseFloat(value);
+      if (isNaN(num)) num = 0;
+      el.style[key] = num;
+    }
+    renderLight();
+    renderLayers();
+    scheduleSave();
+  }
+
+  function setAnchor(newAX, newAY){
+    var el = findEl(selectedId);
+    if (!el) return;
+    var scr = activeScreen();
+    var parent = el.parentId ? findEl(el.parentId) : null;
+    var containerW = parent ? parent.style.width : scr.canvasW;
+    var containerH = parent ? parent.style.height : scr.canvasH;
+    var leftPx = el.style.anchorX === 'right' ? (containerW - el.style.x - el.style.width) : el.style.x;
+    var topPx  = el.style.anchorY === 'bottom' ? (containerH - el.style.y - el.style.height) : el.style.y;
+    el.style.x = newAX === 'right' ? (containerW - leftPx - el.style.width) : leftPx;
+    el.style.y = newAY === 'bottom' ? (containerH - topPx - el.style.height) : topPx;
+    el.style.anchorX = newAX; el.style.anchorY = newAY;
+    renderFull();
+    scheduleSave();
+  }
+
+  // ---------- persistence ----------
+
+  function scheduleSave(){
+    var ind = document.getElementById('save-indicator');
+    ind.textContent = '保存中...';
+    ind.classList.remove('fresh');
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(function(){
+      try{
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ screens:screens, activeScreenId:activeScreenId }));
+        ind.textContent = '保存済み (このブラウザ内)';
+        ind.classList.add('fresh');
+      }catch(e){
+        ind.textContent = '自動保存できません (ストレージ無効)';
+      }
+    }, 350);
+  }
+
+  function loadFromStorage(){
+    try{
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return false;
+      var data = JSON.parse(raw);
+      if (!data || !Array.isArray(data.screens) || !data.screens.length) return false;
+      screens = data.screens;
+      activeScreenId = data.activeScreenId && screens.some(function(s){return s.id===data.activeScreenId;})
+        ? data.activeScreenId : screens[0].id;
+      return true;
+    }catch(e){ return false; }
+  }
+
+  // ---------- rendering ----------
+
+  function renderFull(){
+    renderScreenTabs();
+    renderTopFields();
+    renderPalette();
+    renderParentPicker();
+    renderLayers();
+    renderCanvas();
+    renderInspector();
+    renderCode();
+  }
+  function renderLight(){
+    renderCanvas();
+    renderCode();
+  }
+
+  function renderScreenTabs(){
+    var host = document.getElementById('screen-tabs');
+    host.innerHTML = screens.map(function(s){
+      var active = s.id===activeScreenId ? ' active' : '';
+      var closeBtn = screens.length>1 ? '<button class="screen-tab-close" data-id="'+s.id+'" title="削除">×</button>' : '';
+      return '<div class="screen-tab'+active+'" data-id="'+s.id+'">'+
+        '<span class="screen-tab-name">'+escapeAttr(s.name)+'</span>'+closeBtn+'</div>';
+    }).join('') + '<button class="screen-tab-add" id="btn-add-screen" title="新規スクリーン">+</button>';
+
+    host.onclick = function(e){
+      var addBtn = e.target.closest('#btn-add-screen');
+      if (addBtn){
+        var s = makeBlankScreen('スクリーン ' + (screens.length+1));
+        screens.push(s); activeScreenId = s.id; selectedId = null;
+        renderFull(); scheduleSave();
+        return;
+      }
+      var closeBtn = e.target.closest('.screen-tab-close');
+      if (closeBtn){
+        var id = closeBtn.getAttribute('data-id');
+        var scr = screens.find(function(x){return x.id===id;});
+        if (!confirm('スクリーン「'+(scr?scr.name:'')+'」を削除します。よろしいですか？')) return;
+        screens = screens.filter(function(x){ return x.id!==id; });
+        if (activeScreenId===id) activeScreenId = screens[0].id;
+        selectedId = null;
+        renderFull(); scheduleSave();
+        return;
+      }
+      var tab = e.target.closest('.screen-tab');
+      if (tab){ activeScreenId = tab.getAttribute('data-id'); selectedId = null; renderFull(); }
+    };
+    host.ondblclick = function(e){
+      var tab = e.target.closest('.screen-tab');
+      if (!tab) return;
+      var id = tab.getAttribute('data-id');
+      var scr = screens.find(function(x){return x.id===id;});
+      if (!scr) return;
+      var name = prompt('スクリーン名', scr.name);
+      if (name && name.trim()){ scr.name = name.trim(); renderScreenTabs(); scheduleSave(); }
+    };
+  }
+
+  function renderTopFields(){
+    var scr = activeScreen();
+    if (!scr) return;
+    setValIf('f-doctitle', scr.title);
+    setValIf('f-filename', scr.filename);
+    setValIf('f-canvas-w', scr.canvasW);
+    setValIf('f-canvas-h', scr.canvasH);
+    document.querySelectorAll('.swatch').forEach(function(s){ s.classList.toggle('active', s.getAttribute('data-bg')===scr.canvasBg); });
+  }
+  function setValIf(id, val){ var n=document.getElementById(id); if (n && document.activeElement!==n) n.value = val; }
+
+  function renderPalette(){
+    var host = document.getElementById('palette-list');
+    if (host.childElementCount) return;
+    host.innerHTML = TAG_DEFS.map(function(d){
+      return '<button class="palette-btn" data-tag="'+d.tag+'">'+
+        '<span class="tag-badge">'+d.tag+'</span>'+
+        '<span class="palette-label">'+d.label+'</span></button>';
+    }).join('');
+    host.addEventListener('click', function(e){
+      var btn = e.target.closest('.palette-btn');
+      if(!btn) return;
+      var parentSel = document.getElementById('parent-select').value;
+      addElement(btn.getAttribute('data-tag'), parentSel === 'root' ? null : parentSel);
+    });
+  }
+
+  function renderParentPicker(){
+    var sel = document.getElementById('parent-select');
+    var prev = sel.value || 'root';
+    var options = ['<option value="root">ルート (body)</option>'];
+    var scr = activeScreen();
+    var CONTAINER_TAGS = ['div','ul','li'];
+    (scr?scr.elements:[]).filter(function(e){ return CONTAINER_TAGS.indexOf(e.tag)!==-1; }).forEach(function(e){
+      options.push('<option value="'+e.id+'">#'+e.idAttr+'</option>');
+    });
+    sel.innerHTML = options.join('');
+    if ([].slice.call(sel.options).some(function(o){return o.value===prev;})) sel.value = prev;
+  }
+
+  function depthOf(id){
+    var d = 0, el = findEl(id);
+    while(el && el.parentId){ d++; el = findEl(el.parentId); }
+    return d;
+  }
+
+  function renderLayers(){
+    var host = document.getElementById('layer-list');
+    var scr = activeScreen();
+    var elements = scr ? scr.elements : [];
+    if (elements.length === 0){
+      host.innerHTML = '<div class="layers-empty">まだ要素がありません。左上の「要素を追加」からパネルを組み立ててください。</div>';
+      return;
+    }
+    var order = [];
+    (function walk(parentId){
+      children(parentId).forEach(function(e){ order.push(e); walk(e.id); });
+    })(null);
+    host.innerHTML = order.map(function(e){
+      var sel = e.id === selectedId ? ' selected' : '';
+      var depth = depthOf(e.id);
+      return '<div class="layer-row'+sel+'" data-id="'+e.id+'" style="padding-left:'+(6+depth*16)+'px">'+
+        '<span class="tag-badge small">'+e.tag+'</span>'+
+        '<span class="layer-name">#'+(e.idAttr||'(no id)')+'</span>'+
+        '<button class="layer-del" data-id="'+e.id+'" title="削除">×</button>'+
+        '</div>';
+    }).join('');
+    host.onclick = function(e){
+      var del = e.target.closest('.layer-del');
+      if (del){ deleteElement(del.getAttribute('data-id')); return; }
+      var row = e.target.closest('.layer-row');
+      if (row) selectElement(row.getAttribute('data-id'));
+    };
+  }
+
+  function bgCss(code){
+    if (code==='cyan') return '#00ffff';
+    if (code==='dark') return '#1a1a1a';
+    return '#f2f2f2';
+  }
+
+  function renderCanvas(){
+    var scr = activeScreen();
+    var root = document.getElementById('canvas-root');
+    if (!scr){ root.innerHTML=''; return; }
+    root.style.width = scr.canvasW + 'px';
+    root.style.height = scr.canvasH + 'px';
+    root.style.background = bgCss(scr.canvasBg);
+    root.innerHTML = '';
+    if (scr.elements.length === 0){
+      var hint = document.createElement('div');
+      hint.className = 'empty-canvas-hint';
+      hint.textContent = '要素を追加すると、ここに実際のレイアウトが表示されます';
+      root.appendChild(hint);
+      return;
+    }
+    children(null).forEach(function(e){ root.appendChild(buildElBox(e)); });
+  }
+
+  function applyAnchorPos(box, s){
+    box.style.left = ''; box.style.right = ''; box.style.top = ''; box.style.bottom = '';
+    if (s.anchorX === 'right') box.style.right = s.x + 'px'; else box.style.left = s.x + 'px';
+    if (s.anchorY === 'bottom') box.style.bottom = s.y + 'px'; else box.style.top = s.y + 'px';
+  }
+
+  function buildElBox(el){
+    var box = document.createElement('div');
+    box.className = 'el-box' + (el.id===selectedId ? ' selected' : '') + (el.tag==='img' ? ' img-placeholder' : '');
+    applyAnchorPos(box, el.style);
+    box.style.width = el.style.width + 'px';
+    box.style.height = el.style.height + 'px';
+    box.style.background = hexA(el.style.bgColor, el.style.bgAlpha);
+    box.style.color = el.style.textColor;
+    box.style.fontSize = el.style.fontSize + 'px';
+    box.style.padding = el.style.padding + 'px';
+    box.style.borderRadius = el.style.radius + 'px';
+    box.style.justifyContent = el.style.textAlign==='center' ? 'center' : (el.style.textAlign==='right' ? 'flex-end' : 'flex-start');
+    box.style.alignItems = (el.tag==='button' || el.tag==='img') ? 'center' : 'flex-start';
+    box.style.fontFamily = 'Manrope, sans-serif';
+
+    var label = document.createElement('span');
+    label.className = 'el-label';
+    var anchorTag = (el.style.anchorX==='right'?'R':'L') + (el.style.anchorY==='bottom'?'B':'T');
+    label.textContent = el.tag + (el.idAttr ? ' #'+el.idAttr : '') + ' · ' + anchorTag + (el.rawContent ? ' · RAW' : '');
+    box.appendChild(label);
+
+    var content = document.createElement('span');
+    content.style.pointerEvents = 'none';
+    content.style.whiteSpace = 'pre-wrap';
+    if (el.tag === 'img'){
+      content.style.fontSize = '10px';
+      content.style.fontFamily = 'var(--mono)';
+      content.textContent = el.src ? el.src.split('/').pop() : '(src 未設定)';
+    } else {
+      content.textContent = el.text || '';
+    }
+    box.appendChild(content);
+
+    var kids = children(el.id);
+    if (kids.length){
+      var kidHost = document.createElement('div');
+      kidHost.style.position = 'absolute';
+      kidHost.style.left = '0'; kidHost.style.top = '0';
+      kidHost.style.right = '0'; kidHost.style.bottom = '0';
+      kids.forEach(function(k){ kidHost.appendChild(buildElBox(k)); });
+      box.appendChild(kidHost);
+    }
+
+    var handle = document.createElement('div');
+    handle.className = 'resize-handle';
+    handle.addEventListener('pointerdown', function(e){ startDrag(e, el, 'resize'); });
+    box.appendChild(handle);
+
+    box.addEventListener('pointerdown', function(e){
+      if (e.target === handle) return;
+      startDrag(e, el, 'move');
+    });
+
+    return box;
+  }
+
+  document.getElementById('canvas-root').addEventListener('pointerdown', function(e){
+    if (e.target.id === 'canvas-root'){ selectedId = null; renderFull(); }
+  });
+
+  function startDrag(e, el, mode){
+    e.stopPropagation();
+    e.preventDefault();
+    if (selectedId !== el.id){ selectedId = el.id; renderFull(); }
+    dragState = {
+      id: el.id, mode: mode,
+      startX: e.clientX, startY: e.clientY,
+      origX: el.style.x, origY: el.style.y,
+      origWidth: el.style.width, origHeight: el.style.height
+    };
+    window.addEventListener('pointermove', onDragMove);
+    window.addEventListener('pointerup', onDragEnd);
+  }
+  function onDragMove(e){
+    if(!dragState) return;
+    var el = findEl(dragState.id);
+    if(!el) return;
+    var dx = e.clientX - dragState.startX;
+    var dy = e.clientY - dragState.startY;
+    if (dragState.mode === 'move'){
+      var sx = el.style.anchorX === 'right' ? -dx : dx;
+      var sy = el.style.anchorY === 'bottom' ? -dy : dy;
+      el.style.x = Math.max(0, Math.round(dragState.origX + sx));
+      el.style.y = Math.max(0, Math.round(dragState.origY + sy));
+    } else {
+      el.style.width  = Math.max(16, Math.round(dragState.origWidth + dx));
+      el.style.height = Math.max(14, Math.round(dragState.origHeight + dy));
+    }
+    renderLight();
+    refreshInspectorValuesOnly();
+  }
+  function onDragEnd(){
+    if (dragState) scheduleSave();
+    dragState = null;
+    window.removeEventListener('pointermove', onDragMove);
+    window.removeEventListener('pointerup', onDragEnd);
+  }
+
+  document.addEventListener('keydown', function(e){
+    if (!selectedId) return;
+    var at = document.activeElement;
+    var tag = at ? at.tagName : '';
+    if (tag==='INPUT' || tag==='TEXTAREA' || tag==='SELECT') return;
+    if (e.key === 'Delete' || e.key === 'Backspace'){
+      e.preventDefault();
+      deleteElement(selectedId);
+    }
+  });
+
+  function hexToRgb(hex){
+    var h = (hex||'#000000').replace('#','');
+    if (h.length===3) h = h.split('').map(function(c){return c+c;}).join('');
+    var num = parseInt(h,16) || 0;
+    return { r:(num>>16)&255, g:(num>>8)&255, b:num&255 };
+  }
+  function hexA(hex, alpha255){
+    var c = hexToRgb(hex);
+    return 'rgba('+c.r+','+c.g+','+c.b+','+(alpha255/255)+')';
+  }
+
+  function refreshInspectorValuesOnly(){
+    var el = findEl(selectedId);
+    if(!el) return;
+    setValIf('f-x', el.style.x);
+    setValIf('f-y', el.style.y);
+    setValIf('f-width', el.style.width);
+    setValIf('f-height', el.style.height);
+  }
+
+  function renderInspector(){
+    var host = document.getElementById('inspector-content');
+    var el = findEl(selectedId);
+    if (!el){
+      host.innerHTML = '<div class="inspector-empty">キャンバス上の要素、または左のレイヤー一覧から選択すると、ここでプロパティを編集できます。<br><br>選択中に <b>Delete</b> キーで削除できます。</div>';
+      return;
+    }
+    var def = tagDef(el.tag);
+    var html = '<div class="inspector-body">';
+    html += '<div class="inspector-head"><span class="tag-badge">'+el.tag+'</span>'+
+      '<div class="inspector-head-actions">'+
+      '<button class="btn-ghost-small" id="btn-dup" title="複製">複製</button>'+
+      '<button class="btn-ghost-small" id="btn-front" title="最前面へ">前面</button>'+
+      '<button class="btn-ghost-small" id="btn-back" title="最背面へ">背面</button>'+
+      '<button class="btn-danger-ghost" id="btn-delete">削除</button>'+
+      '</div></div>';
+
+    html += field('f-id','ID','text', el.idAttr);
+    html += field('f-class','クラス','text', el.className);
+    if (def.hasText){
+      html += '<div class="field"><label>'+(el.tag==='input' ? '初期値 (value)' : 'テキスト / 内容')+'</label>'+
+        '<textarea id="f-text" rows="2" style="background:var(--surface-2);border:1px solid var(--border);color:var(--text);'+
+        'border-radius:6px;padding:7px 9px;font-size:12.5px;font-family:var(--mono);width:100%;resize:vertical;">'+
+        escapeXml(el.text)+'</textarea></div>';
+      html += '<div class="toggle-row"><input type="checkbox" id="f-raw-content"'+(el.rawContent?' checked':'')+'>'+
+        '<label for="f-raw-content">生RMLとして出力 (エスケープしない)</label></div>';
+      if (el.rawContent){
+        html += '<div class="anchor-field-info">例: <code style="font-family:var(--mono)">{{ hp }}</code> のようなRmlUiデータバインディング式や、<code style="font-family:var(--mono)">&lt;span&gt;</code>等の子タグをそのまま書けます。</div>';
+      }
+    }
+    if (def.hasSrc)  html += field('f-src','画像パス (src)','text', el.src||'');
+
+    html += field('f-custom-attrs','カスタム属性 (開始タグへそのまま挿入)','text', el.customAttrs||'');
+    html += '<div class="anchor-field-info">例: <code style="font-family:var(--mono)">data-if="hp &gt; 0"</code></div>';
+
+    html += '<div class="divider"></div>';
+    html += '<div class="anchor-field">';
+    html += '<div class="anchor-grid" id="anchor-grid">'+
+      ['left|top','right|top','left|bottom','right|bottom'].map(function(pair){
+        var parts = pair.split('|'); var ax=parts[0], ay=parts[1];
+        var active = (el.style.anchorX===ax && el.style.anchorY===ay) ? ' active' : '';
+        return '<button class="anchor-btn'+active+'" data-ax="'+ax+'" data-ay="'+ay+'"></button>';
+      }).join('') + '</div>';
+    html += '<div class="anchor-field-info">基準コーナー<br>右下HUD等は右上/右下を選択<br>X/Yはその基準からの距離</div>';
+    html += '</div>';
+
+    html += '<div class="field-row">'+numField('f-x','X',el.style.x)+numField('f-y','Y',el.style.y)+'</div>';
+    html += '<div class="field-row">'+numField('f-width','幅 (width)',el.style.width)+numField('f-height','高さ (height)',el.style.height)+'</div>';
+    html += '<div class="divider"></div>';
+    html += '<div class="field"><label>背景色 (RCSS は 0-255 アルファ)</label><div class="color-row">'+
+      '<input type="color" id="f-bg" value="'+el.style.bgColor+'">'+
+      '<input type="number" id="f-bg-alpha" min="0" max="255" value="'+el.style.bgAlpha+'">'+
+      '<span class="hint">不透明度</span></div></div>';
+    html += field('f-color','文字色','color', el.style.textColor);
+    html += '<div class="field-row">'+numField('f-fontsize','フォントサイズ',el.style.fontSize)+numField('f-padding','パディング',el.style.padding)+'</div>';
+    html += '<div class="field-row">'+numField('f-radius','角丸',el.style.radius)+
+      '<div class="field"><label>整列</label><select id="f-align">'+
+        ['left','center','right'].map(function(a){return '<option value="'+a+'"'+(el.style.textAlign===a?' selected':'')+'>'+a+'</option>';}).join('')+
+      '</select></div></div>';
+
+    html += '<div class="divider"></div>';
+    html += '<div class="toggle-row"><input type="checkbox" id="f-hover-enabled"'+(el.style.hoverEnabled?' checked':'')+'>'+
+      '<label for="f-hover-enabled">ホバー時に色を変える (:hover)</label></div>';
+    if (el.style.hoverEnabled){
+      html += '<div class="hover-fields">';
+      html += '<div class="field"><label>ホバー背景色</label><div class="color-row">'+
+        '<input type="color" id="f-hover-bg" value="'+el.style.hoverBgColor+'"></div></div>';
+      html += '<div class="field"><label>ホバー文字色</label><div class="color-row">'+
+        '<input type="color" id="f-hover-color" value="'+el.style.hoverTextColor+'"></div></div>';
+      html += '</div>';
+    }
+    html += '</div>';
+    host.innerHTML = html;
+
+    bindText('f-id','idAttr'); bindText('f-class','className');
+    if (def.hasText){
+      bindText('f-text','text');
+      var rawChk = document.getElementById('f-raw-content');
+      if (rawChk) rawChk.addEventListener('change', function(){ updateField('rawContent', this.checked); renderInspector(); });
+    }
+    if (def.hasSrc)  bindText('f-src','src');
+    bindText('f-custom-attrs','customAttrs');
+    bindNum('f-x','x'); bindNum('f-y','y'); bindNum('f-width','width'); bindNum('f-height','height');
+    bindColor('f-bg','bgColor'); bindNum('f-bg-alpha','bgAlpha');
+    bindColor('f-color','textColor');
+    bindNum('f-fontsize','fontSize'); bindNum('f-padding','padding'); bindNum('f-radius','radius');
+    var alignSel = document.getElementById('f-align');
+    if (alignSel) alignSel.addEventListener('change', function(){ updateField('textAlign', this.value); });
+
+    var hoverChk = document.getElementById('f-hover-enabled');
+    if (hoverChk) hoverChk.addEventListener('change', function(){ updateField('hoverEnabled', this.checked); renderInspector(); });
+    bindColor('f-hover-bg','hoverBgColor');
+    bindColor('f-hover-color','hoverTextColor');
+
+    document.getElementById('anchor-grid').addEventListener('click', function(e){
+      var btn = e.target.closest('.anchor-btn');
+      if (btn) setAnchor(btn.getAttribute('data-ax'), btn.getAttribute('data-ay'));
+    });
+
+    document.getElementById('btn-delete').addEventListener('click', function(){ deleteElement(el.id); });
+    document.getElementById('btn-dup').addEventListener('click', function(){ duplicateElement(el.id); });
+    document.getElementById('btn-front').addEventListener('click', function(){ bringToFront(el.id); });
+    document.getElementById('btn-back').addEventListener('click', function(){ sendToBack(el.id); });
+  }
+  function field(id,label,type,value){
+    return '<div class="field"><label>'+label+'</label><input type="'+type+'" id="'+id+'" value="'+escapeAttr(value)+'"></div>';
+  }
+  function numField(id,label,value){
+    return '<div class="field"><label>'+label+'</label><input type="number" id="'+id+'" value="'+value+'"></div>';
+  }
+  function bindText(id,key){ var n=document.getElementById(id); if(n) n.addEventListener('input', function(){ updateField(key,this.value); }); }
+  function bindNum(id,key){ var n=document.getElementById(id); if(n) n.addEventListener('input', function(){ updateField(key,this.value); }); }
+  function bindColor(id,key){ var n=document.getElementById(id); if(n) n.addEventListener('input', function(){ updateField(key,this.value); }); }
+
+  function escapeAttr(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;'); }
+  function escapeXml(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  // ---------- codegen ----------
+
+  function genRml(scr){
+    function renderTag(el, indent){
+      var attrs = '';
+      if (el.idAttr) attrs += ' id="'+escapeXml(el.idAttr)+'"';
+      if (el.className) attrs += ' class="'+escapeXml(el.className)+'"';
+      if (el.customAttrs) attrs += ' ' + el.customAttrs.trim();
+      if (el.tag === 'input'){
+        var val = el.text ? ' value="'+escapeXml(el.text)+'"' : '';
+        return indent+'<input type="text"'+attrs+val+' />';
+      }
+      if (el.tag === 'img'){
+        return indent+'<img'+attrs+' src="'+escapeXml(el.src||'')+'" />';
+      }
+      var kids = children(el.id);
+      if (!kids.length){
+        // rawContent 有効時は {{ hp }} 等のデータバインディング式や子タグをエスケープせずそのまま出力する
+        var text = el.rawContent ? (el.text||'') : escapeXml(el.text||'');
+        return indent+'<'+el.tag+attrs+'>'+text+'</'+el.tag+'>';
+      }
+      var inner = kids.map(function(k){ return renderTag(k, indent+'\t'); }).join('\n');
+      return indent+'<'+el.tag+attrs+'>\n'+inner+'\n'+indent+'</'+el.tag+'>';
+    }
+    var roots = children(null);
+    var body = roots.length ? roots.map(function(r){ return renderTag(r,'\t'); }).join('\n') : '\t<!-- 要素を追加してください -->';
+    return '<rml>\n<head>\n\t<title>'+escapeXml(scr.title)+'</title>\n\t<link type="text/rcss" href="'+scr.filename+'.rcss" />\n</head>\n<body>\n'+body+'\n</body>\n</rml>\n';
+  }
+
+  function genRcss(scr){
+    var out = 'body\n{\n\twidth: '+scr.canvasW+'px;\n\theight: '+scr.canvasH+'px;\n}\n';
+    scr.elements.forEach(function(el){
+      var sel = el.idAttr ? '#'+el.idAttr : (el.className ? '.'+el.className.split(' ')[0] : null);
+      if (!sel) return;
+      var s = el.style;
+      var rgb = hexToRgb(s.bgColor);
+      var rules = [
+        'position: absolute;',
+        (s.anchorX==='right' ? 'right: ' : 'left: ') + s.x + 'px;',
+        (s.anchorY==='bottom' ? 'bottom: ' : 'top: ') + s.y + 'px;',
+        'width: '+s.width+'px;',
+        'height: '+s.height+'px;'
+      ];
+      if (s.padding) rules.push('padding: '+s.padding+'px;');
+      rules.push('background-color: rgba('+rgb.r+', '+rgb.g+', '+rgb.b+', '+s.bgAlpha+');');
+      rules.push('color: '+s.textColor+';');
+      if (s.fontSize) rules.push('font-size: '+s.fontSize+'px;');
+      if (s.radius) rules.push('border-radius: '+s.radius+'px;');
+      if (s.textAlign && s.textAlign !== 'left') rules.push('text-align: '+s.textAlign+';');
+      out += '\n'+sel+'\n{\n'+rules.map(function(r){return '\t'+r;}).join('\n')+'\n}\n';
+
+      if (s.hoverEnabled){
+        var hb = hexToRgb(s.hoverBgColor);
+        var hoverRules = [
+          'background-color: rgba('+hb.r+', '+hb.g+', '+hb.b+', '+s.bgAlpha+');',
+          'color: '+s.hoverTextColor+';'
+        ];
+        out += '\n'+sel+':hover\n{\n'+hoverRules.map(function(r){return '\t'+r;}).join('\n')+'\n}\n';
+      }
+    });
+    return out;
+  }
+
+  function genProjectJson(){
+    return JSON.stringify({ screens:screens, activeScreenId:activeScreenId }, null, 2);
+  }
+
+  function currentTabFilename(scr){
+    if (activeTab === 'rml') return scr.filename + '.rml';
+    if (activeTab === 'rcss') return scr.filename + '.rcss';
+    return 'project.json';
+  }
+
+  function setCodeEditHint(state, message){
+    var hint = document.getElementById('code-edit-hint');
+    if (!hint) return;
+    if (state === 'off'){ hint.style.display = 'none'; hint.title = ''; return; }
+    hint.style.display = '';
+    if (state === 'error'){
+      var short = (message||'構文エラー').replace(/\s+/g,' ').trim();
+      if (short.length > 40) short = short.slice(0,40) + '…';
+      hint.textContent = '構文エラー: ' + short;
+      hint.title = message || '';
+    } else {
+      hint.textContent = '直接編集中';
+      hint.title = '';
+    }
+    hint.style.color = state === 'error' ? 'var(--danger)' : 'var(--accent)';
+    hint.style.borderColor = state === 'error' ? 'var(--danger)' : 'var(--border-soft)';
+  }
+
+  function renderCode(){
+    var scr = activeScreen();
+    var ta = document.getElementById('code-output');
+    if (!scr){ ta.value=''; return; }
+    var text = activeTab === 'rml' ? genRml(scr) : activeTab === 'rcss' ? genRcss(scr) : genProjectJson();
+    ta.value = text;
+    ta.readOnly = (activeTab === 'json');
+    setCodeEditHint(activeTab === 'json' ? 'off' : 'on');
+    var hint = document.getElementById('save-hint');
+    var localNote = IN_CLAUDE_HOST
+      ? '<span class="local-note">ここ (プレビュー) では拡張子の制約でファイル保存が使えないため「コピー」のみです。Tools/RmlUiPanelBuilder.html をブラウザで直接開くと保存ボタンが使えます。</span>'
+      : '<span class="local-note">「保存」ボタンで実際にファイルとしてダウンロードされます。</span>';
+    if (activeTab === 'json'){
+      hint.innerHTML = 'プロジェクト全体のバックアップ (複数スクリーン分)。ダブルクリックで貼り付け読み込み。<br>' + localNote;
+    } else {
+      hint.innerHTML = 'Assets/UI/' + escapeAttr(currentTabFilename(scr)) + ' として保存。直接編集すると即キャンバスに反映されます。<br>' + localNote;
+    }
+  }
+
+  var liveEditTimer = null;
+  document.querySelectorAll('.code-tab').forEach(function(tab){
+    tab.addEventListener('click', function(){
+      clearTimeout(liveEditTimer);
+      activeTab = tab.getAttribute('data-tab');
+      document.querySelectorAll('.code-tab').forEach(function(t){ t.classList.toggle('active', t===tab); });
+      renderCode();
+    });
+  });
+
+  document.getElementById('code-output').addEventListener('input', function(){
+    if (activeTab !== 'rml' && activeTab !== 'rcss') return;
+    var text = this.value;
+    clearTimeout(liveEditTimer);
+    liveEditTimer = setTimeout(function(){
+      var result = (activeTab === 'rml') ? liveApplyRml(text) : liveApplyRcss(text);
+      setCodeEditHint(result.ok ? 'on' : 'error', result.message);
+      if (result.ok){
+        renderTopFields();
+        renderParentPicker();
+        renderLayers();
+        renderCanvas();
+        renderInspector();
+        scheduleSave();
+      }
+    }, 350);
+  });
+
+  document.getElementById('btn-copy').addEventListener('click', function(){
+    var text = document.getElementById('code-output').value;
+    var btn = this;
+    function done(){
+      var orig = btn.textContent;
+      btn.textContent = 'コピーしました';
+      btn.classList.add('copied');
+      setTimeout(function(){ btn.textContent = orig; btn.classList.remove('copied'); }, 1400);
+    }
+    function fallback(){
+      try{
+        var ta = document.createElement('textarea');
+        ta.value = text; ta.style.position='fixed'; ta.style.opacity='0';
+        document.body.appendChild(ta); ta.focus(); ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        done();
+      }catch(err){ alert('コピーできませんでした。テキストを選択して手動でコピーしてください。'); }
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(done).catch(fallback);
+    } else fallback();
+  });
+
+  // claude.ai の Artifact ビューア内では window.claude が注入される。
+  // .rml/.rcss は downloads capability の許可拡張子リストに無く、代替拡張子での
+  // 保存は仕様上非推奨のため、Artifact 内ではダウンロードボタン自体を出さず
+  // コピーのみにする (ローカルファイルとして開いている場合だけ実際に保存できる)。
+  var IN_CLAUDE_HOST = (typeof window.claude !== 'undefined');
+  if (IN_CLAUDE_HOST){
+    document.getElementById('btn-download').style.display = 'none';
+    document.getElementById('btn-download-both').style.display = 'none';
+  }
+
+  function downloadTextFile(filename, text){
+    try{
+      var blob = new Blob([text], {type:'text/plain;charset=utf-8'});
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+      return true;
+    }catch(e){ return false; }
+  }
+  function flashButton(btn, text, ms){
+    var orig = btn.textContent;
+    btn.textContent = text;
+    btn.classList.add('copied');
+    setTimeout(function(){ btn.textContent = orig; btn.classList.remove('copied'); }, ms||1400);
+  }
+  function warnIfBlocked(){
+    alert('この環境ではファイル保存を実行できませんでした。\nArtifact のプレビュー内などブラウザのサンドボックスで download が無効化されている可能性があります。\nTools/RmlUiPanelBuilder.html をブラウザで直接開いた状態なら保存できます。\nそれ以外の場合は「コピー」でテキストをコピーし、手動でファイルを作成してください。');
+  }
+
+  document.getElementById('btn-download').addEventListener('click', function(){
+    var scr = activeScreen(); if(!scr) return;
+    var text = document.getElementById('code-output').value;
+    var ok = downloadTextFile(currentTabFilename(scr), text);
+    if (ok) flashButton(this, '保存しました'); else warnIfBlocked();
+  });
+
+  document.getElementById('btn-download-both').addEventListener('click', function(){
+    var scr = activeScreen(); if(!scr) return;
+    var ok1 = downloadTextFile(scr.filename+'.rml', genRml(scr));
+    var ok2 = downloadTextFile(scr.filename+'.rcss', genRcss(scr));
+    if (ok1 && ok2) flashButton(this, '2ファイル保存しました'); else warnIfBlocked();
+  });
+
+  document.querySelectorAll('.swatch').forEach(function(sw){
+    sw.addEventListener('click', function(){
+      var scr = activeScreen(); if(!scr) return;
+      scr.canvasBg = sw.getAttribute('data-bg');
+      document.querySelectorAll('.swatch').forEach(function(s){ s.classList.toggle('active', s===sw); });
+      renderCanvas();
+      scheduleSave();
+    });
+  });
+
+  document.getElementById('f-doctitle').addEventListener('input', function(){
+    var scr = activeScreen(); if(!scr) return; scr.title = this.value; renderCode(); scheduleSave();
+  });
+  document.getElementById('f-filename').addEventListener('input', function(){
+    var scr = activeScreen(); if(!scr) return; scr.filename = this.value.trim() || 'panel'; renderCode(); scheduleSave();
+  });
+  document.getElementById('f-canvas-w').addEventListener('input', function(){
+    var scr = activeScreen(); if(!scr) return;
+    scr.canvasW = Math.max(64, parseInt(this.value,10) || scr.canvasW);
+    renderCanvas(); renderCode(); scheduleSave();
+  });
+  document.getElementById('f-canvas-h').addEventListener('input', function(){
+    var scr = activeScreen(); if(!scr) return;
+    scr.canvasH = Math.max(64, parseInt(this.value,10) || scr.canvasH);
+    renderCanvas(); renderCode(); scheduleSave();
+  });
+  document.getElementById('canvas-preset').addEventListener('change', function(){
+    if (!this.value) return;
+    var parts = this.value.split('x');
+    var scr = activeScreen(); if(!scr) return;
+    scr.canvasW = parseInt(parts[0],10); scr.canvasH = parseInt(parts[1],10);
+    this.value = '';
+    renderTopFields(); renderCanvas(); renderCode(); scheduleSave();
+  });
+
+  document.getElementById('btn-load-demo').addEventListener('click', function(){
+    var scr = loadDemoAsScreen();
+    screens.push(scr);
+    activeScreenId = scr.id;
+    selectedId = scr.elements[0] ? scr.elements[0].id : null;
+    renderFull(); scheduleSave();
+  });
+
+  function loadDemoAsScreen(){
+    var scr = makeBlankScreen('Cortex デモ');
+    scr.title = 'Cortex RmlUi Demo';
+    scr.filename = 'demo';
+
+    var panel = { id:'u'+(scr.uidCounter++), tag:'div', parentId:null, idAttr:'panel', className:'', text:'', src:'', rawContent:false, customAttrs:'',
+      style: Object.assign(defaultStyleFor('div'), {x:24,y:24,width:320,height:150,bgColor:'#141414',bgAlpha:220}) };
+    scr.elements.push(panel);
+
+    scr.elements.push({ id:'u'+(scr.uidCounter++), tag:'h1', parentId:panel.id, idAttr:'heading-1', className:'', text:'Cortex RmlUi Demo', src:'', rawContent:false, customAttrs:'',
+      style: Object.assign(defaultStyleFor('h1'), {x:0,y:0,width:288,height:28,fontSize:20}) });
+
+    scr.elements.push({ id:'u'+(scr.uidCounter++), tag:'p', parentId:panel.id, idAttr:'paragraph-1', className:'', text:'RmlUi の描画パイプライン疎通確認用ドキュメント', src:'', rawContent:false, customAttrs:'',
+      style: Object.assign(defaultStyleFor('p'), {x:0,y:36,width:288,height:20,textColor:'#dcdcdc'}) });
+
+    scr.elements.push({ id:'u'+(scr.uidCounter++), tag:'button', parentId:panel.id, idAttr:'demo-button', className:'', text:'Click me', src:'', rawContent:false, customAttrs:'',
+      style: Object.assign(defaultStyleFor('button'), {x:0,y:66,width:288,height:36,hoverEnabled:true,hoverBgColor:'#4a84c4',hoverTextColor:'#ffffff'}) });
+
+    scr.nextNum = {div:1,h1:1,p:1,button:1,input:0,img:0};
+    return scr;
+  }
+
+  document.getElementById('btn-load-hierarchy').addEventListener('click', function(){
+    var scr = loadHierarchyExampleAsScreen();
+    screens.push(scr);
+    activeScreenId = scr.id;
+    selectedId = scr.elements[0].id;
+    renderFull(); scheduleSave();
+  });
+
+  function loadHierarchyExampleAsScreen(){
+    // エディタ風の Hierarchy (シーンツリー) パネルの簡易モックアップ。
+    // 実際のツリー展開/選択ロジックは無く、あくまで見た目とレイアウトの叩き台。
+    var scr = makeBlankScreen('Hierarchy 例');
+    scr.title = 'Hierarchy Panel Example';
+    scr.filename = 'hierarchy';
+    scr.canvasW = 720; scr.canvasH = 480; scr.canvasBg = 'dark';
+
+    var PANEL_W = 260, ROW_H = 24, HEADER_H = 30;
+    var rows = [
+      {label:'▾ Scene',            depth:0, bold:true},
+      {label:'Main Camera',             depth:1},
+      {label:'Player',                  depth:1},
+      {label:'Mesh Renderer',           depth:2},
+      {label:'Collider',                depth:2},
+      {label:'Directional Light',       depth:1},
+      {label:'UI Canvas',               depth:1},
+      {label:'HUD Panel',               depth:2, selected:true}
+    ];
+    var panelH = HEADER_H + rows.length*ROW_H + 12;
+
+    var panel = { id:'u'+(scr.uidCounter++), tag:'div', parentId:null, idAttr:'hierarchy-panel', className:'', text:'', src:'', rawContent:false, customAttrs:'',
+      style: Object.assign(defaultStyleFor('div'), {anchorX:'left',anchorY:'top',x:24,y:24,width:PANEL_W,height:panelH,
+        bgColor:'#1b1f25',bgAlpha:235,radius:6,padding:0}) };
+    scr.elements.push(panel);
+
+    var header = { id:'u'+(scr.uidCounter++), tag:'div', parentId:panel.id, idAttr:'hierarchy-header', className:'', text:'Hierarchy', src:'', rawContent:false, customAttrs:'',
+      style: Object.assign(defaultStyleFor('div'), {x:0,y:0,width:PANEL_W,height:HEADER_H,
+        bgColor:'#232933',bgAlpha:255,textColor:'#e8a33d',fontSize:12,padding:9,radius:0}) };
+    scr.elements.push(header);
+
+    rows.forEach(function(r, i){
+      var indent = 10 + r.depth*16;
+      scr.elements.push({
+        id:'u'+(scr.uidCounter++), tag:'p', parentId:panel.id,
+        idAttr:'row-'+(i+1), className:'', text:r.label, src:'', rawContent:false, customAttrs:'',
+        style: Object.assign(defaultStyleFor('p'), {
+          anchorX:'left', anchorY:'top',
+          x:indent, y:HEADER_H + 6 + i*ROW_H, width:PANEL_W-indent-8, height:ROW_H-2,
+          fontSize:12.5,
+          textColor: r.selected ? '#ffffff' : (r.bold ? '#e8e6e1' : '#b7bfc9'),
+          bgColor: r.selected ? '#3a6ea5' : '#000000',
+          bgAlpha: r.selected ? 255 : 0,
+          radius: r.selected ? 4 : 0,
+          padding: r.selected ? 3 : 0
+        })
+      });
+    });
+
+    scr.nextNum = {div:2,h1:0,p:rows.length,button:0,input:0,img:0};
+    return scr;
+  }
+
+  // ---------- import (RML/RCSS のベストエフォート取り込み) ----------
+
+  document.getElementById('btn-import-toggle').addEventListener('click', function(){
+    document.getElementById('import-panel').classList.toggle('open');
+  });
+
+  document.getElementById('btn-import-apply').addEventListener('click', function(){
+    var rmlText = document.getElementById('import-rml').value;
+    if (!rmlText.trim()){ alert('RML を貼り付けてください。'); return; }
+    var parsed = parseRmlToScreen(rmlText);
+    if (!parsed){ alert('RML の解析に失敗しました。<body> タグを含む正しい RML か確認してください。'); return; }
+    var rcssText = document.getElementById('import-rcss').value;
+    if (rcssText.trim()) applyRcssToScreen(parsed, rcssText);
+
+    screens.push(parsed);
+    activeScreenId = parsed.id;
+    selectedId = null;
+    document.getElementById('import-panel').classList.remove('open');
+    document.getElementById('import-rml').value = '';
+    document.getElementById('import-rcss').value = '';
+    renderFull(); scheduleSave();
+  });
+
+  // ---------- live edit (コード欄への直接書き込み → 即キャンバス反映) ----------
+  var LIVE_SUPPORTED = ['div','ul','li','h1','h2','h3','p','button','input','img'];
+  var LIVE_SPECIAL_ATTRS = {id:1,class:1,src:1,value:1,type:1};
+
+  function liveApplyRml(rmlText){
+    var scr = activeScreen(); if (!scr) return {ok:false, message:'アクティブなスクリーンがありません'};
+    var doc;
+    try{ doc = new DOMParser().parseFromString(rmlText, 'application/xml'); }catch(e){ return {ok:false, message:e.message}; }
+    var perr = doc.querySelector('parsererror');
+    if (perr){
+      var raw = perr.textContent.trim();
+      var m = /error on line \d+ at column \d+:.*/i.exec(raw);
+      return {ok:false, message: m ? m[0] : raw.split('\n')[0]};
+    }
+    var body = doc.querySelector('body');
+    if (!body) return {ok:false, message:'<body> 要素が見つかりません'};
+
+    var oldById = {};
+    scr.elements.forEach(function(el){ if (el.idAttr) oldById[el.idAttr] = el; });
+    var curSel = findEl(selectedId);
+    var oldSelectedIdAttr = curSel ? curSel.idAttr : null;
+
+    var titleNode = doc.querySelector('title');
+    if (titleNode && titleNode.textContent.trim()) scr.title = titleNode.textContent.trim();
+
+    var newElements = [];
+    var nextNum = {div:0,ul:0,li:0,h1:0,p:0,button:0,input:0,img:0};
+    var uidCounter = scr.uidCounter;
+
+    function walk(domNode, parentId){
+      Array.prototype.forEach.call(domNode.children, function(child){
+        var tag = child.tagName.toLowerCase();
+        if (LIVE_SUPPORTED.indexOf(tag) === -1) tag = 'div';
+        if (tag==='h2' || tag==='h3') tag = 'h1';
+        nextNum[tag] = (nextNum[tag]||0) + 1;
+        var idAttr = child.getAttribute('id') || (ID_PREFIX[tag]+'-'+nextNum[tag]);
+        var old = oldById[idAttr];
+        var extraAttrs = [];
+        Array.prototype.forEach.call(child.attributes, function(a){
+          if (!LIVE_SPECIAL_ATTRS[a.name]) extraAttrs.push(a.name+'="'+a.value+'"');
+        });
+        var el = {
+          id: 'u'+(uidCounter++),
+          tag: tag,
+          parentId: parentId,
+          idAttr: idAttr,
+          className: child.getAttribute('class') || '',
+          text: '',
+          src: tag==='img' ? (child.getAttribute('src')||'') : '',
+          rawContent: old ? !!old.rawContent : false,
+          customAttrs: extraAttrs.join(' '),
+          style: old ? old.style : defaultStyleFor(tag)
+        };
+        if (tag==='input') el.text = child.getAttribute('value') || '';
+        else if (!child.children.length) el.text = (child.textContent||'').trim();
+        newElements.push(el);
+        walk(child, el.id);
+      });
+    }
+    walk(body, null);
+
+    scr.elements = newElements;
+    scr.nextNum = nextNum;
+    scr.uidCounter = uidCounter;
+
+    if (oldSelectedIdAttr){
+      var again = scr.elements.find(function(e){ return e.idAttr === oldSelectedIdAttr; });
+      selectedId = again ? again.id : null;
+    } else {
+      selectedId = null;
+    }
+    return {ok:true};
+  }
+
+  function liveApplyRcss(rcssText){
+    var scr = activeScreen(); if (!scr) return {ok:false, message:'アクティブなスクリーンがありません'};
+    applyRcssToScreen(scr, rcssText);
+    return {ok:true};
+  }
+
+  function parseRmlToScreen(rmlText){
+    var doc;
+    try{ doc = new DOMParser().parseFromString(rmlText, 'application/xml'); }catch(e){ return null; }
+    if (doc.querySelector('parsererror')) return null;
+    var body = doc.querySelector('body');
+    if (!body) return null;
+
+    var scr = makeBlankScreen('取り込んだ画面');
+    var titleNode = doc.querySelector('title');
+    if (titleNode && titleNode.textContent.trim()) scr.title = titleNode.textContent.trim();
+    var linkNode = doc.querySelector('link[type="text/rcss"]');
+    if (linkNode){
+      var href = linkNode.getAttribute('href') || '';
+      scr.filename = href.replace(/\.rcss$/,'') || 'panel';
+    }
+
+    var SUPPORTED = ['div','ul','li','h1','h2','h3','p','button','input','img'];
+    function walk(domNode, parentId){
+      Array.prototype.forEach.call(domNode.children, function(child){
+        var tag = child.tagName.toLowerCase();
+        if (SUPPORTED.indexOf(tag) === -1) tag = 'div';
+        if (tag==='h2' || tag==='h3') tag = 'h1';
+        scr.nextNum[tag] = (scr.nextNum[tag]||0) + 1;
+        var el = {
+          id: 'u'+(scr.uidCounter++),
+          tag: tag,
+          parentId: parentId,
+          idAttr: child.getAttribute('id') || (ID_PREFIX[tag]+'-'+scr.nextNum[tag]),
+          className: child.getAttribute('class') || '',
+          text: '',
+          src: tag==='img' ? (child.getAttribute('src')||'') : '',
+          style: defaultStyleFor(tag)
+        };
+        if (tag==='input') el.text = child.getAttribute('value') || '';
+        else if (!child.children.length) el.text = (child.textContent||'').trim();
+        scr.elements.push(el);
+        walk(child, el.id);
+      });
+    }
+    walk(body, null);
+    return scr;
+  }
+
+  function applyRcssToScreen(scr, rcssText){
+    var bodyMatch = rcssText.match(/\bbody\s*\{([^}]*)\}/);
+    if (bodyMatch){
+      var wm = /width\s*:\s*([\d.]+)px/.exec(bodyMatch[1]); if (wm) scr.canvasW = parseFloat(wm[1]);
+      var hm = /height\s*:\s*([\d.]+)px/.exec(bodyMatch[1]); if (hm) scr.canvasH = parseFloat(hm[1]);
+    }
+    function numPx(v){ var m = /(-?[\d.]+)px/.exec(v||''); return m ? parseFloat(m[1]) : null; }
+    function rgbaParts(v){
+      var m = /rgba?\(([^)]+)\)/.exec(v||'');
+      if (!m) return null;
+      var parts = m[1].split(',').map(function(x){ return parseFloat(x); });
+      return { r:parts[0]||0, g:parts[1]||0, b:parts[2]||0, a: parts.length>3 ? parts[3] : 255 };
+    }
+    function toHex(r,g,b){
+      function h(n){ n=Math.max(0,Math.min(255,Math.round(n))); var s=n.toString(16); return s.length<2?'0'+s:s; }
+      return '#'+h(r)+h(g)+h(b);
+    }
+    function parseDecls(body){
+      var props = {};
+      body.split(';').forEach(function(decl){
+        var idx = decl.indexOf(':');
+        if (idx<0) return;
+        var k = decl.slice(0,idx).trim();
+        var v = decl.slice(idx+1).trim();
+        if (k) props[k] = v;
+      });
+      return props;
+    }
+
+    var blockRe = /(#[\w\-]+)(:hover)?\s*\{([^}]*)\}/g;
+    var m;
+    while ((m = blockRe.exec(rcssText))){
+      var selId = m[1].slice(1);
+      var isHover = !!m[2];
+      var props = parseDecls(m[3]);
+      var el = scr.elements.find(function(e){ return e.idAttr === selId; });
+      if (!el) continue;
+      var s = el.style;
+      if (isHover){
+        if (props['background-color']){ var hc = rgbaParts(props['background-color']); if (hc){ s.hoverEnabled = true; s.hoverBgColor = toHex(hc.r,hc.g,hc.b); } }
+        if (props['color']){ s.hoverTextColor = props['color'].match(/^#/) ? props['color'] : s.hoverTextColor; }
+        continue;
+      }
+      if ('left' in props){ s.anchorX='left'; s.x = numPx(props['left']) || 0; }
+      if ('right' in props){ s.anchorX='right'; s.x = numPx(props['right']) || 0; }
+      if ('top' in props){ s.anchorY='top'; s.y = numPx(props['top']) || 0; }
+      if ('bottom' in props){ s.anchorY='bottom'; s.y = numPx(props['bottom']) || 0; }
+      if ('width' in props) s.width = numPx(props['width']) || s.width;
+      if ('height' in props) s.height = numPx(props['height']) || s.height;
+      if ('padding' in props) s.padding = numPx(props['padding']) || 0;
+      if ('border-radius' in props) s.radius = numPx(props['border-radius']) || 0;
+      if ('font-size' in props) s.fontSize = numPx(props['font-size']) || s.fontSize;
+      if ('text-align' in props) s.textAlign = props['text-align'].trim();
+      if ('background-color' in props){
+        var bg = rgbaParts(props['background-color']);
+        if (bg){ s.bgColor = toHex(bg.r,bg.g,bg.b); s.bgAlpha = bg.a; }
+      }
+      if ('color' in props && /^#/.test(props['color'].trim())) s.textColor = props['color'].trim();
+    }
+  }
+
+  // ---------- JSON project import (project.json タブから) ----------
+
+  document.getElementById('code-output').addEventListener('dblclick', function(){
+    if (activeTab !== 'json') return;
+    var pasted = prompt('project.json の内容を貼り付けて読み込みます (現在のプロジェクトは置き換えられます):', '');
+    if (!pasted) return;
+    try{
+      var data = JSON.parse(pasted);
+      if (!data || !Array.isArray(data.screens) || !data.screens.length) throw new Error('invalid');
+      screens = data.screens;
+      activeScreenId = data.activeScreenId || screens[0].id;
+      selectedId = null;
+      renderFull(); scheduleSave();
+    }catch(e){ alert('JSON の読み込みに失敗しました。project.json タブでコピーした内容そのままを貼り付けてください。'); }
+  });
+
+  // ---------- column / row resize ----------
+  function initColumnResize(){
+    var root = document.documentElement;
+    var saved = null;
+    try{ saved = JSON.parse(localStorage.getItem('rmlui-panel-builder-layout')||'null'); }catch(e){}
+    var paletteW = (saved && saved.paletteW) || 228;
+    var inspectorW = (saved && saved.inspectorW) || 322;
+    var codeH = (saved && saved.codeH) || 300;
+    var wrapOn = !!(saved && saved.wrapOn);
+    applyWidths();
+    applyWrap();
+
+    function applyWidths(){
+      root.style.setProperty('--palette-w', paletteW+'px');
+      root.style.setProperty('--inspector-w', inspectorW+'px');
+      root.style.setProperty('--code-h', codeH+'px');
+    }
+    function applyWrap(){
+      var pre = document.getElementById('code-output');
+      var btn = document.getElementById('btn-wrap');
+      if (pre) pre.classList.toggle('wrap', wrapOn);
+      if (btn) btn.classList.toggle('on', wrapOn);
+    }
+    function saveLayout(){
+      try{ localStorage.setItem('rmlui-panel-builder-layout', JSON.stringify({paletteW:paletteW, inspectorW:inspectorW, codeH:codeH, wrapOn:wrapOn})); }catch(e){}
+    }
+
+    function bindHandle(handleId, axis){
+      var handle = document.getElementById(handleId);
+      if (!handle) return;
+      handle.addEventListener('pointerdown', function(e){
+        e.preventDefault();
+        handle.classList.add('dragging');
+        var startX = e.clientX, startY = e.clientY;
+        var startPalette = paletteW, startInspector = inspectorW, startCode = codeH;
+        function onMove(ev){
+          if (axis === 'left'){
+            var dx = ev.clientX - startX;
+            paletteW = Math.max(160, Math.min(480, startPalette + dx));
+          } else if (axis === 'right'){
+            var dx2 = ev.clientX - startX;
+            inspectorW = Math.max(240, Math.min(560, startInspector - dx2));
+          } else if (axis === 'code'){
+            var dy = ev.clientY - startY;
+            codeH = Math.max(120, Math.min(680, startCode - dy));
+          }
+          applyWidths();
+        }
+        function onUp(){
+          handle.classList.remove('dragging');
+          window.removeEventListener('pointermove', onMove);
+          window.removeEventListener('pointerup', onUp);
+          saveLayout();
+        }
+        window.addEventListener('pointermove', onMove);
+        window.addEventListener('pointerup', onUp);
+      });
+    }
+    bindHandle('handle-left', 'left');
+    bindHandle('handle-right', 'right');
+    bindHandle('handle-code', 'code');
+
+    var wrapBtn = document.getElementById('btn-wrap');
+    if (wrapBtn){
+      wrapBtn.addEventListener('click', function(){
+        wrapOn = !wrapOn;
+        applyWrap();
+        saveLayout();
+      });
+    }
+  }
+
+  // ---------- init ----------
+  if (!loadFromStorage()){
+    var demo = loadDemoAsScreen();
+    screens = [demo];
+    activeScreenId = demo.id;
+    selectedId = demo.elements[0].id;
+  }
+  renderFull();
+  initColumnResize();
+})();
+</script>
+</body>
+</html>

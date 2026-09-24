@@ -1,14 +1,16 @@
-﻿<#
+<#
 .SYNOPSIS
     Cortex の依存関係セットアップスクリプト。
 
 .DESCRIPTION
-    1. git submodule (json / DirectX-Headers / DirectXTex / assimp / llama.cpp / curl) を取得・更新する  ← 常に実行
+    1. git submodule (json / DirectX-Headers / DirectXTex / assimp / RmlUi / freetype / llama.cpp / curl) を取得・更新する  ← 常に実行
     2. assimp を CMake (Visual Studio 17 2022 / x64 / Debug + Release) で静的ライブラリとしてビルドする  ← 常に実行
        -> モデル読み込みに必須。Cortex.sln のビルド前に一度実行しておくこと。
-    3. (任意) LocalLLM/llama.cpp を CMake (Visual Studio 17 2022 / x64 / Release) でビルドする
+    3. FreeType / RmlUi を CMake (Visual Studio 17 2022 / x64 / Debug + Release) で静的ライブラリとしてビルドする  ← 常に実行
+       -> RmlUiGUI (実ゲーム UI) に必須。Cortex.sln のビルド前に一度実行しておくこと。
+    4. (任意) LocalLLM/llama.cpp を CMake (Visual Studio 17 2022 / x64 / Release) でビルドする
        -> BaseLLM クラスを使う場合のみ必要。-Llama を付けたときだけ実行。
-    4. (任意) curl を静的ライブラリとしてビルドする  (-BuildCurl)
+    5. (任意) curl を静的ライブラリとしてビルドする  (-BuildCurl)
 
     json / DirectX-Headers はヘッダオンリーのため取得のみでビルド不要。
     DirectXTex は Manager が .vcxproj を ProjectReference しているため CMake ビルド不要。
@@ -58,8 +60,12 @@ function Require-Command($name) {
     }
 }
 function Invoke-Native {
-    param([Parameter(Mandatory)][string]$Exe, [Parameter(ValueFromRemainingArguments)][string[]]$Args)
-    & $Exe @Args
+    # 呼び出し側は必ず配列 (@('-S', $Src, '-B', $Build, ...)) を渡すこと。
+    # ValueFromRemainingArguments で "-S" 等をそのまま受けると、PowerShell が
+    # この関数自身の名前付きパラメーターとして解釈しようとして
+    # "A parameter cannot be found that matches parameter name 'S'" で落ちる。
+    param([Parameter(Mandatory)][string]$Exe, [Parameter(Mandatory)][string[]]$ArgList)
+    & $Exe @ArgList
     if ($LASTEXITCODE -ne 0) { throw "$Exe が終了コード $LASTEXITCODE で失敗しました。" }
 }
 
@@ -67,8 +73,8 @@ Require-Command git
 
 # ----------------------------------------------------------------------
 Write-Step "git submodule を取得・更新"
-Invoke-Native git submodule sync --recursive
-Invoke-Native git submodule update --init --recursive --progress
+Invoke-Native git @('submodule', 'sync', '--recursive')
+Invoke-Native git @('submodule', 'update', '--init', '--recursive', '--progress')
 git submodule status --recursive
 
 # ----------------------------------------------------------------------
@@ -102,28 +108,81 @@ if ($Clean -and (Test-Path $AssimpBuild)) {
 # assimp.lib と zlib を build\lib\<Config>\ へまとめて出力する。
 # assimp 本体はツールセット接尾辞 (-vc143-mt) も Debug 接尾辞も付けないが、
 # 同梱 zlib だけは Debug で zlibstaticd.lib になる (contrib 側で強制)。
-Invoke-Native cmake `
-    -S $AssimpSrc -B $AssimpBuild -G 'Visual Studio 17 2022' -A x64 `
-    "-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY=$AssimpBuild\lib" `
-    -DBUILD_SHARED_LIBS=OFF `
-    -DASSIMP_BUILD_TESTS=OFF -DASSIMP_BUILD_ASSIMP_TOOLS=OFF -DASSIMP_BUILD_SAMPLES=OFF `
-    -DASSIMP_INSTALL=OFF -DASSIMP_WARNINGS_AS_ERRORS=OFF `
-    -DASSIMP_BUILD_ZLIB=ON `
-    -DASSIMP_INJECT_DEBUG_POSTFIX=OFF "-DLIBRARY_SUFFIX=" `
-    -DASSIMP_BUILD_ALL_IMPORTERS_BY_DEFAULT=OFF `
-    -DASSIMP_BUILD_OBJ_IMPORTER=ON -DASSIMP_BUILD_FBX_IMPORTER=ON -DASSIMP_BUILD_GLTF_IMPORTER=ON `
-    -DASSIMP_BUILD_ALL_EXPORTERS_BY_DEFAULT=OFF `
-    -DASSIMP_BUILD_OBJ_EXPORTER=ON -DASSIMP_BUILD_FBX_EXPORTER=ON -DASSIMP_BUILD_GLTF_EXPORTER=ON
-Invoke-Native cmake --build $AssimpBuild --config Debug   --parallel
-Invoke-Native cmake --build $AssimpBuild --config Release --parallel
+$assimpConfigureArgs = @(
+    '-S', $AssimpSrc, '-B', $AssimpBuild, '-G', 'Visual Studio 17 2022', '-A', 'x64',
+    "-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY=$AssimpBuild\lib",
+    '-DBUILD_SHARED_LIBS=OFF',
+    '-DASSIMP_BUILD_TESTS=OFF', '-DASSIMP_BUILD_ASSIMP_TOOLS=OFF', '-DASSIMP_BUILD_SAMPLES=OFF',
+    '-DASSIMP_INSTALL=OFF', '-DASSIMP_WARNINGS_AS_ERRORS=OFF',
+    '-DASSIMP_BUILD_ZLIB=ON',
+    '-DASSIMP_INJECT_DEBUG_POSTFIX=OFF', '-DLIBRARY_SUFFIX=',
+    '-DASSIMP_BUILD_ALL_IMPORTERS_BY_DEFAULT=OFF',
+    '-DASSIMP_BUILD_OBJ_IMPORTER=ON', '-DASSIMP_BUILD_FBX_IMPORTER=ON', '-DASSIMP_BUILD_GLTF_IMPORTER=ON',
+    '-DASSIMP_BUILD_ALL_EXPORTERS_BY_DEFAULT=OFF',
+    '-DASSIMP_BUILD_OBJ_EXPORTER=ON', '-DASSIMP_BUILD_FBX_EXPORTER=ON', '-DASSIMP_BUILD_GLTF_EXPORTER=ON'
+)
+Invoke-Native cmake $assimpConfigureArgs
+Invoke-Native cmake @('--build', $AssimpBuild, '--config', 'Debug',   '--parallel')
+Invoke-Native cmake @('--build', $AssimpBuild, '--config', 'Release', '--parallel')
 
 Write-Host "`n  生成された .lib:" -ForegroundColor Green
 Get-ChildItem -Recurse -Filter *.lib $AssimpBuild |
     Where-Object { $_.Name -match '^(assimp|zlibstaticd?)\.lib$' } |
     ForEach-Object { "    " + $_.FullName.Substring($RepoRoot.Length + 1) }
 
+# ----------------------------------------------------------------------
+Write-Step "FreeType をビルド (Visual Studio 17 2022 / x64 / Debug + Release)"
+
+$FreetypeSrc     = Join-Path $RepoRoot 'ThirdParty\freetype'
+$FreetypeBuild   = Join-Path $FreetypeSrc 'build'
+$FreetypeInstall = Join-Path $FreetypeSrc 'install'
+if ($Clean) {
+    if (Test-Path $FreetypeBuild)   { Remove-Item -Recurse -Force $FreetypeBuild }
+    if (Test-Path $FreetypeInstall) { Remove-Item -Recurse -Force $FreetypeInstall }
+}
+
+# RmlUi の既定フォントエンジン。静的ライブラリとして install\ 配下へ出力する
+# (RmlUi 側の find_package(Freetype) が CMAKE_PREFIX_PATH 経由でこれを見つける)。
+$freetypeConfigureArgs = @(
+    '-S', $FreetypeSrc, '-B', $FreetypeBuild, '-G', 'Visual Studio 17 2022', '-A', 'x64',
+    '-DBUILD_SHARED_LIBS=OFF',
+    '-DFT_DISABLE_ZLIB=ON', '-DFT_DISABLE_BZIP2=ON', '-DFT_DISABLE_PNG=ON',
+    '-DFT_DISABLE_HARFBUZZ=ON', '-DFT_DISABLE_BROTLI=ON',
+    "-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY=$FreetypeBuild\lib",
+    "-DCMAKE_INSTALL_PREFIX=$FreetypeInstall"
+)
+Invoke-Native cmake $freetypeConfigureArgs
+Invoke-Native cmake @('--build', $FreetypeBuild, '--config', 'Debug',   '--target', 'install', '--parallel')
+Invoke-Native cmake @('--build', $FreetypeBuild, '--config', 'Release', '--target', 'install', '--parallel')
+
+# ----------------------------------------------------------------------
+Write-Step "RmlUi をビルド (Visual Studio 17 2022 / x64 / Debug + Release)"
+
+$RmluiSrc   = Join-Path $RepoRoot 'ThirdParty\RmlUi'
+$RmluiBuild = Join-Path $RmluiSrc 'build'
+if ($Clean -and (Test-Path $RmluiBuild)) { Remove-Item -Recurse -Force $RmluiBuild }
+
+# 実ゲーム UI (.rml/.rcss)。RmlUiGUI プロジェクトが RenderInterface/SystemInterface を
+# 自前実装して Cortex の DirectX12 に接続する (公式 Backends は使わない)。
+$rmluiConfigureArgs = @(
+    '-S', $RmluiSrc, '-B', $RmluiBuild, '-G', 'Visual Studio 17 2022', '-A', 'x64',
+    '-DBUILD_SHARED_LIBS=OFF',
+    '-DRMLUI_FONT_ENGINE=freetype',
+    '-DRMLUI_SAMPLES=OFF', '-DBUILD_TESTING=OFF', '-DRMLUI_LUA_BINDINGS=OFF',
+    "-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY=$RmluiBuild\lib",
+    "-DCMAKE_PREFIX_PATH=$FreetypeInstall"
+)
+Invoke-Native cmake $rmluiConfigureArgs
+Invoke-Native cmake @('--build', $RmluiBuild, '--config', 'Debug',   '--parallel')
+Invoke-Native cmake @('--build', $RmluiBuild, '--config', 'Release', '--parallel')
+
+Write-Host "`n  生成された .lib:" -ForegroundColor Green
+Get-ChildItem -Recurse -Filter *.lib $RmluiBuild |
+    Where-Object { $_.Name -match '^rmlui(_debugger)?\.lib$' } |
+    ForEach-Object { "    " + $_.FullName.Substring($RepoRoot.Length + 1) }
+
 if (-not $Llama) {
-    Write-Step "完了 (submodule + assimp)"
+    Write-Step "完了 (submodule + assimp + FreeType + RmlUi)"
     Write-Host @"
 Cortex.sln は Release / x64 でそのままビルドできます (assimp はビルド済み)。
 ローカル LLM (BaseLLM / llama.cpp) を使う場合は -Llama を付けて再実行してください。
@@ -147,15 +206,17 @@ if ($Cuda -and -not (Get-Command nvcc -ErrorAction SilentlyContinue)) {
     throw "nvcc が見つかりません。CUDA Toolkit を導入するか -Cuda を外して実行してください。"
 }
 
-Invoke-Native cmake `
-    -S $LlamaSrc -B $LlamaBuild -G 'Visual Studio 17 2022' -A x64 `
-    -DBUILD_SHARED_LIBS=ON `
-    "-DGGML_CUDA=$cudaFlag" `
-    -DLLAMA_CURL=OFF `
-    -DLLAMA_BUILD_COMMON=ON `
-    -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF `
-    -DLLAMA_BUILD_TOOLS=OFF -DLLAMA_BUILD_SERVER=OFF
-Invoke-Native cmake --build $LlamaBuild --config Release --parallel
+$llamaConfigureArgs = @(
+    '-S', $LlamaSrc, '-B', $LlamaBuild, '-G', 'Visual Studio 17 2022', '-A', 'x64',
+    '-DBUILD_SHARED_LIBS=ON',
+    "-DGGML_CUDA=$cudaFlag",
+    '-DLLAMA_CURL=OFF',
+    '-DLLAMA_BUILD_COMMON=ON',
+    '-DLLAMA_BUILD_TESTS=OFF', '-DLLAMA_BUILD_EXAMPLES=OFF',
+    '-DLLAMA_BUILD_TOOLS=OFF', '-DLLAMA_BUILD_SERVER=OFF'
+)
+Invoke-Native cmake $llamaConfigureArgs
+Invoke-Native cmake @('--build', $LlamaBuild, '--config', 'Release', '--parallel')
 
 Write-Host "`n  生成された .lib:" -ForegroundColor Green
 Get-ChildItem -Recurse -Filter *.lib $LlamaBuild |
@@ -168,10 +229,13 @@ if ($BuildCurl) {
     $CurlSrc   = Join-Path $RepoRoot 'Curl\curl'
     $CurlBuild = Join-Path $CurlSrc 'build'
     if ($Clean -and (Test-Path $CurlBuild)) { Remove-Item -Recurse -Force $CurlBuild }
-    Invoke-Native cmake -S $CurlSrc -B $CurlBuild -G 'Visual Studio 17 2022' -A x64 `
-        -DBUILD_SHARED_LIBS=OFF -DBUILD_CURL_EXE=OFF -DCURL_USE_SCHANNEL=ON `
-        -DCURL_ZLIB=OFF -DCURL_BROTLI=OFF -DCURL_ZSTD=OFF -DUSE_LIBIDN2=OFF
-    Invoke-Native cmake --build $CurlBuild --config Release --parallel
+    $curlConfigureArgs = @(
+        '-S', $CurlSrc, '-B', $CurlBuild, '-G', 'Visual Studio 17 2022', '-A', 'x64',
+        '-DBUILD_SHARED_LIBS=OFF', '-DBUILD_CURL_EXE=OFF', '-DCURL_USE_SCHANNEL=ON',
+        '-DCURL_ZLIB=OFF', '-DCURL_BROTLI=OFF', '-DCURL_ZSTD=OFF', '-DUSE_LIBIDN2=OFF'
+    )
+    Invoke-Native cmake $curlConfigureArgs
+    Invoke-Native cmake @('--build', $CurlBuild, '--config', 'Release', '--parallel')
 }
 
 Write-Step "完了"
