@@ -33,7 +33,7 @@ Windows / C++20 / DirectX 12 + llama.cpp のデスクトップアプリ。
 ### 2. submodule を取得
 
 ```powershell
-git clone https://github.com/AkinoShota/Cortex.git
+git clone https://github.com/PIGUMI/Cortex.git
 cd Cortex
 git submodule update --init --recursive
 ```
@@ -78,7 +78,7 @@ git submodule update --init --recursive
 - **リポジトリを `C:\dev\Cortex` などへ移動する**（推奨。OneDrive 配下に `build/` を置く問題も回避）
 - 一時的に ASCII ドライブを割り当てる:
   ```powershell
-  subst X: "C:\Users\<名前>\OneDrive\デスクトップ\Project\AkinoShota"
+  subst X: "C:\Users\<名前>\OneDrive\デスクトップ\Project"
   cd X:\Cortex
   # ここで下記のビルドを実行。終わったら subst X: /D
   ```
